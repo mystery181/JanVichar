@@ -1,6 +1,8 @@
 :root {
     --primary-red: #a23333;
     --secondary-red: #fde8e8;
+    --primary-color: #a23333;
+    --secondary-color: #fde8e8;
     /* Light Red */
     --accent-red: #800000;
     --text-dark: #333333;

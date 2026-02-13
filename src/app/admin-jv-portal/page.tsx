@@ -81,31 +81,43 @@ export default function AdminPortal() {
                 </div>
             </div>
 
-            <div className="pil-card" style={{ padding: "0", overflow: "hidden" }}>
+            <div style={{ backgroundColor: "white", borderRadius: "12px", boxShadow: "0 4px 6px rgba(0,0,0,0.1)", overflow: "hidden", border: "1px solid #eee" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
-                    <thead style={{ backgroundColor: "var(--primary-color)", color: "white" }}>
+                    <thead style={{ backgroundColor: "#800000", color: "white" }}>
                         <tr>
-                            <th style={{ padding: "15px" }}>Title</th>
-                            <th style={{ padding: "15px" }}>Creator</th>
-                            <th style={{ padding: "15px" }}>Supporters</th>
-                            <th style={{ padding: "15px" }}>Status</th>
-                            <th style={{ padding: "15px" }}>Actions</th>
+                            <th style={{ padding: "15px", borderBottom: "1px solid #eee" }}>Title</th>
+                            <th style={{ padding: "15px", borderBottom: "1px solid #eee" }}>Creator</th>
+                            <th style={{ padding: "15px", borderBottom: "1px solid #eee" }}>Supporters</th>
+                            <th style={{ padding: "15px", borderBottom: "1px solid #eee" }}>Status</th>
+                            <th style={{ padding: "15px", borderBottom: "1px solid #eee" }}>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {pils.map((pil) => (
-                            <tr key={pil.id} style={{ borderBottom: "1px solid #eee" }}>
+                            <tr key={pil.id} style={{ borderBottom: "1px solid #f0f0f0", transition: "background 0.2s" }}>
                                 <td style={{ padding: "15px" }}>
-                                    <div style={{ fontWeight: "bold" }}>{pil.title}</div>
-                                    <div style={{ fontSize: "0.8rem", color: "#666" }}>{pil.id}</div>
+                                    <div style={{ fontWeight: "700", color: "#333", marginBottom: "4px" }}>{pil.title}</div>
+                                    <div style={{ fontSize: "0.75rem", color: "#999", fontFamily: "monospace" }}>ID: {pil.id}</div>
                                 </td>
-                                <td style={{ padding: "15px" }}>{pil.creatorName || "Anonymous"}</td>
-                                <td style={{ padding: "15px" }}>{pil.supporters}</td>
+                                <td style={{ padding: "15px", color: "#555" }}>{pil.creatorName || "Anonymous"}</td>
+                                <td style={{ padding: "15px", textAlign: "center" }}>
+                                    <span style={{ backgroundColor: "#f0f0f0", padding: "4px 10px", borderRadius: "12px", fontSize: "0.9rem", fontWeight: "600" }}>
+                                        {pil.supporters}
+                                    </span>
+                                </td>
                                 <td style={{ padding: "15px" }}>
                                     <select
                                         value={pil.status || "Filed"}
                                         onChange={(e) => updateStatus(pil.id, e.target.value)}
-                                        style={{ padding: "5px", borderRadius: "4px", border: "1px solid #ccc" }}
+                                        style={{
+                                            padding: "8px",
+                                            borderRadius: "6px",
+                                            border: "1px solid #ddd",
+                                            backgroundColor: "#fff",
+                                            cursor: "pointer",
+                                            width: "100%",
+                                            fontSize: "0.9rem"
+                                        }}
                                     >
                                         <option value="Filed">Filed</option>
                                         <option value="Under Review">Under Review</option>
@@ -115,18 +127,18 @@ export default function AdminPortal() {
                                     </select>
                                 </td>
                                 <td style={{ padding: "15px" }}>
-                                    <div style={{ display: "flex", gap: "10px" }}>
+                                    <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
                                         <button
                                             onClick={() => router.push(`/pil/${pil.id}`)}
                                             title="View PIL"
-                                            style={{ background: "none", border: "none", cursor: "pointer", color: "#666" }}
+                                            style={{ background: "#f0f0f0", border: "none", cursor: "pointer", color: "#555", padding: "8px", borderRadius: "6px", display: "flex", alignItems: "center" }}
                                         >
                                             <Edit size={18} />
                                         </button>
                                         <button
                                             onClick={() => handleDelete(pil.id)}
                                             title="Delete PIL"
-                                            style={{ background: "none", border: "none", cursor: "pointer", color: "#c53030" }}
+                                            style={{ background: "#fee2e2", border: "none", cursor: "pointer", color: "#c53030", padding: "8px", borderRadius: "6px", display: "flex", alignItems: "center" }}
                                         >
                                             <Trash2 size={18} />
                                         </button>
