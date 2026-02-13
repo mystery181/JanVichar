@@ -12,6 +12,7 @@ interface PIL {
     supporters: number;
     createdAt: any;
     creatorName?: string;
+    status?: string;
 }
 
 export default function Tracker() {
@@ -67,7 +68,9 @@ export default function Tracker() {
                     {pils.length > 0 ? (
                         pils.map((pil) => (
                             <div key={pil.id} className="pil-card">
-                                <div className="pil-status status-filed">Active</div>
+                                <div className={`pil-status status-${(pil.status || "filed").toLowerCase().replace(" ", "-")}`}>
+                                    {pil.status || "Filed"}
+                                </div>
                                 <h4>{pil.title}</h4>
                                 <p className="pil-desc">
                                     {pil.description.substring(0, 150)}

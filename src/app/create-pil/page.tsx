@@ -52,6 +52,7 @@ export default function CreatePIL() {
                 creatorName: user.displayName,
                 createdAt: serverTimestamp(),
                 supporters: 0,
+                status: "Filed",
                 upvotedBy: []
             });
             router.push(`/pil/${docRef.id}`);

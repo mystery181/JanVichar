@@ -17,6 +17,7 @@ interface PIL {
     createdAt: any;
     createdBy: string;
     creatorName?: string;
+    status?: string;
     upvotedBy?: string[];
 }
 
@@ -144,7 +145,9 @@ export default function PILDetail() {
             <div className="pil-card" style={{ padding: "40px", position: "relative" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "20px" }}>
                     <div style={{ flex: 1 }}>
-                        <div className="pil-status status-filed" style={{ display: "inline-block", marginBottom: "15px" }}>Active</div>
+                        <div className={`pil-status status-${(pil.status || "filed").toLowerCase().replace(" ", "-")}`} style={{ display: "inline-block", marginBottom: "15px" }}>
+                            {pil.status || "Filed"}
+                        </div>
                         <h2 style={{ fontSize: "2.5rem", marginBottom: "10px", color: "var(--primary-color)" }}>{pil.title}</h2>
                         <p style={{ color: "#666", marginBottom: "20px" }}>
                             Filed on {pil.createdAt ? new Date(pil.createdAt.seconds * 1000).toLocaleDateString() : "Just now"}
