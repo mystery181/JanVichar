@@ -17,8 +17,6 @@ interface PIL {
     status?: string;
 }
 
-const ADMIN_EMAIL = "tejusjaiswal13@gmail.com"; // Assuming this is the owner's email based on the repo name
-
 export default function AdminPortal() {
     const { user, loading: authLoading } = useAuth();
     const router = useRouter();
@@ -26,26 +24,30 @@ export default function AdminPortal() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!authLoading) {
-            if (!user || user.email !== ADMIN_EMAIL) {
-                router.push("/"); // Redirect if not admin
-                return;
-            }
-
-            // Fetch all PILs for admin
-            const q = query(collection(db, "pils"), orderBy("createdAt", "desc"));
-            const unsubscribe = onSnapshot(q, (snapshot) => {
-                const pilsData = snapshot.docs.map((doc) => ({
-                    id: doc.id,
-                    ...doc.data(),
-                })) as PIL[];
-                setPils(pilsData);
-                setLoading(false);
-            });
-
-            return () => unsubscribe();
+        const isAdmin = localStorage.getItem("jv_admin_session") === "true";
+        if (!isAdmin) {
+            router.push("/admin-login");
+            return;
         }
-    }, [user, authLoading, router]);
+
+        // Fetch all PILs for admin
+        const q = query(collection(db, "pils"), orderBy("createdAt", "desc"));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const pilsData = snapshot.docs.map((doc) => ({
+                id: doc.id,
+                ...doc.data(),
+            })) as PIL[];
+            setPils(pilsData);
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [router]);
+
+    const handleAdminLogout = () => {
+        localStorage.removeItem("jv_admin_session");
+        router.push("/");
+    };
 
     const handleDelete = async (id: string) => {
         if (confirm("Are you sure you want to delete this PIL? This action cannot be undone.")) {
@@ -76,8 +78,16 @@ export default function AdminPortal() {
                     <h2 style={{ color: "var(--primary-color)" }}>JanVichar Secret Admin Portal</h2>
                     <p>Full control over all filed PILs</p>
                 </div>
-                <div style={{ backgroundColor: "#fde8e8", padding: "10px 20px", borderRadius: "20px", color: "var(--primary-color)", fontWeight: "bold" }}>
-                    Admin Mode Active
+                <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                    <div style={{ backgroundColor: "#fde8e8", padding: "10px 20px", borderRadius: "20px", color: "var(--primary-color)", fontWeight: "bold" }}>
+                        Admin Mode Active
+                    </div>
+                    <button
+                        onClick={handleAdminLogout}
+                        style={{ background: "#333", color: "white", border: "none", padding: "10px 20px", borderRadius: "20px", cursor: "pointer", fontWeight: "600" }}
+                    >
+                        Logout Admin
+                    </button>
                 </div>
             </div>
 

@@ -31,6 +31,9 @@ export default function RootLayout({
                 <Link href="/terms">Terms of Service</Link>
                 <Link href="/contact">Contact Us</Link>
               </div>
+              <div style={{ marginTop: "10px", textAlign: "right", opacity: 0.3, fontSize: "0.7rem" }}>
+                <Link href="/admin-login" style={{ textDecoration: "none", color: "inherit" }}>Admin</Link>
+              </div>
             </div>
           </footer>
         </AuthProvider>
