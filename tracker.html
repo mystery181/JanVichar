@@ -52,6 +52,17 @@
             align-items: center;
             height: 70px;
         }
+        .logo{
+            display:flex;
+            align-items: center;
+        }
+        .logo-img{
+            height: 70px;
+            width: auto;
+            border-radius: 50%;
+            margin-right: 8px;
+            display: block;
+        }
         .logo h1 {
             font-size: 1.5rem;
             color: var(--primary-red);
@@ -82,10 +93,9 @@
             transition: all 0.3s;
         }
         .btn-tracker:hover {
-           background-color: var(--white);
-    color: var(--primary-red);
-    transform: translateY(-2px);
-}
+            background-color: var(--white);
+            color: var(--primary-red) !important;
+        }
         /* Tracker Section */
         .tracker-section {
             padding: 60px 0;
@@ -130,7 +140,7 @@
         .btn-search {
             padding: 12px 30px;
             background-color: var(--primary-red);
-            color: var(--white);
+            color: var(--white) !important;
             border: none;
             border-radius: 6px;
             font-weight: 600;
@@ -138,10 +148,9 @@
             transition: background-color 0.3s;
         }
         .btn-search:hover {
-           background-color: var(--white);
-    color: var(--primary-red);
-    transform: translateY(-2px);
-}
+            background-color: var(--white);
+            color: var(--primary-red) !important;
+        }
         .demos {
             text-align: center;
             margin-bottom: 40px;
@@ -279,6 +288,8 @@
     <header>
         <div class="container">
             <div class="logo">
+                <img src="Maroon and Gold Elegant Law Firm Logo_20260213_143524_0000.png"alt="PIL India Logo"
+                class="logo-img">
                 <h1>JanVichar</h1>
             </div>
             <nav>
@@ -286,7 +297,7 @@
                     <li><a href="index.html">Home</a></li>
                     <li><a href="login.html">Login</a></li>
                     <li><a href="#">Tracker</a></li>
-                    <li><a href="login.html"class="active btn-tracker">File a PIL</a></li>
+                    <li><a href="login.html"class="active btn-tracker">File PIL</a></li>
                 </ul>
             </nav>
         </div>
@@ -364,7 +375,7 @@
     </main>
     <footer>
         <div class="container">
-            <p>&copy; 2026 JanVichar. All rights reserved.</p>
+            <p>&copy; 2024 Indian PIL Filing Portal. All rights reserved.</p>
             <div class="footer-links">
                 <a href="#">Privacy Policy</a>
                 <a href="#">Terms of Service</a>
@@ -387,12 +398,39 @@
             // Mock Data Logic
             let stage = 0; // 0 to 5
             let statusText = "";
-            // Determine stage based on mock CNRs
-            if (cnr.includes('1234')) { stage = 1; statusText = "FILED - Scrutiny Pending"; }
-            else if (cnr.includes('5678')) { stage = 2; statusText = "UNDER SCRUTINY - In Process"; }
-            else if (cnr.includes('9012')) { stage = 3; statusText = "ADMITTED / ACCEPTED"; }
-            else if (cnr.includes('3456')) { stage = 4; statusText = "HEARING IN PROGRESS"; }
-            else if (cnr.includes('7890')) { stage = 5; statusText = "DISPOSED / RESULT DECLARED"; }
+            let pName = "Rajesh Kumar (Demo)"; // Default
+            let pDate = "01 Jan 2024"; // Default
+            // Determine details based on mock CNRs
+            if (cnr.includes('1234')) {
+                stage = 1;
+                statusText = "FILED - Scrutiny Pending";
+                pName = "Amit Sharma";
+                pDate = "12 Jan 2024";
+            }
+            else if (cnr.includes('5678')) {
+                stage = 2;
+                statusText = "UNDER SCRUTINY - In Process";
+                pName = "Priya Singh";
+                pDate = "28 Nov 2023";
+            }
+            else if (cnr.includes('9012')) {
+                stage = 3;
+                statusText = "ADMITTED / ACCEPTED";
+                pName = "Rahul Verma";
+                pDate = "05 Oct 2023";
+            }
+            else if (cnr.includes('3456')) {
+                stage = 4;
+                statusText = "HEARING IN PROGRESS";
+                pName = "Sneha Gupta";
+                pDate = "15 Aug 2023";
+            }
+            else if (cnr.includes('7890')) {
+                stage = 5;
+                statusText = "DISPOSED / RESULT DECLARED";
+                pName = "Vikram Malhotra";
+                pDate = "20 May 2023";
+            }
             else {
                 // Default fallback if random number entered
                 stage = 1;
@@ -401,6 +439,8 @@
             // Update UI
             detailsSection.style.display = 'block';
             document.getElementById('p-status').innerText = statusText;
+            document.getElementById('p-name').innerText = pName;
+            document.getElementById('p-date').innerText = pDate;
             updateTimeline(stage);
         }
         function updateTimeline(stage) {
