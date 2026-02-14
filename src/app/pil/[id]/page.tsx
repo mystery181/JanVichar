@@ -22,7 +22,10 @@ import {
     CheckCircle2,
     Sparkles,
     Zap,
-    Info
+    Info,
+    Image as ImageIcon,
+    File,
+    Paperclip
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -41,6 +44,7 @@ interface PIL {
     upvotedBy?: string[];
     hearingResult?: string;
     hearingDate?: string;
+    evidenceFiles?: { name: string; url: string; type: string }[];
 }
 
 export default function PILDetail() {
@@ -67,7 +71,7 @@ export default function PILDetail() {
                         setUpvoted(true);
                     }
                 }
-            } catch (error) {
+            } catch (error: unknown) {
                 console.error("Error fetching PIL", error);
             } finally {
                 setLoading(false);
@@ -482,21 +486,54 @@ export default function PILDetail() {
                                 </div>
                             </section>
 
-                            {pil.evidence && (
+                            {(pil.evidence || (pil.evidenceFiles && pil.evidenceFiles.length > 0)) && (
                                 <section className="space-y-6">
                                     <h2 className="text-2xl font-bold flex items-center gap-3">
                                         <Scale className="text-primary" size={24} />
                                         Evidence & Resources
                                     </h2>
-                                    <div className="bg-muted/30 border border-border border-dashed rounded-3xl p-8 italic text-muted-foreground relative overflow-hidden">
-                                        <div className="relative z-10 flex gap-4">
-                                            <ExternalLink className="flex-shrink-0 text-primary/30" size={24} />
-                                            <div>{pil.evidence}</div>
+
+                                    {pil.evidence && (
+                                        <div className="bg-muted/30 border border-border border-dashed rounded-3xl p-8 italic text-muted-foreground relative overflow-hidden">
+                                            <div className="relative z-10 flex gap-4">
+                                                <ExternalLink className="flex-shrink-0 text-primary/30" size={24} />
+                                                <div>{pil.evidence}</div>
+                                            </div>
+                                            <div className="absolute top-0 right-0 p-2 opacity-5">
+                                                <ShieldAlert size={120} />
+                                            </div>
                                         </div>
-                                        <div className="absolute top-0 right-0 p-2 opacity-5">
-                                            <ShieldAlert size={120} />
+                                    )}
+
+                                    {pil.evidenceFiles && pil.evidenceFiles.length > 0 && (
+                                        <div className="space-y-4">
+                                            <h3 className="text-sm font-bold flex items-center gap-2 text-muted-foreground uppercase tracking-wider">
+                                                <Paperclip size={16} />
+                                                Digital Attachments
+                                            </h3>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                {pil.evidenceFiles.map((file, i) => (
+                                                    <a
+                                                        key={i}
+                                                        href={file.url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="flex items-center gap-4 p-4 bg-card border border-border rounded-2xl hover:border-primary/50 hover:shadow-md transition-all group"
+                                                    >
+                                                        <div className="w-12 h-12 rounded-xl bg-primary/5 flex items-center justify-center text-primary group-hover:bg-primary/10 transition-colors shrink-0">
+                                                            {file.type.startsWith("image/") ? <ImageIcon size={24} /> : <File size={24} />}
+                                                        </div>
+                                                        <div className="flex flex-col overflow-hidden">
+                                                            <span className="text-sm font-bold truncate">{file.name}</span>
+                                                            <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight">
+                                                                {file.type.split('/')[1]?.toUpperCase() || "FILE"} DOCUMENT
+                                                            </span>
+                                                        </div>
+                                                    </a>
+                                                ))}
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
                                 </section>
                             )}
                         </div>
