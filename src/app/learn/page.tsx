@@ -50,11 +50,11 @@ export default function Learn() {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
                                 <div className="bg-muted/30 border border-border p-6 rounded-2xl hover:border-primary/30 transition-all group">
                                     <div className="text-primary font-black text-lg mb-2 group-hover:translate-x-1 transition-transform">Article 32</div>
-                                    <p className="text-sm text-muted-foreground font-medium">Enforcement of Fundamental Rights in the Supreme Court. The "heart and soul" of the Constitution.</p>
+                                    <p className="text-sm text-muted-foreground font-medium">Enforcement of Fundamental Rights in the Supreme Court. The &quot;heart and soul&quot; of the Constitution.</p>
                                 </div>
                                 <div className="bg-muted/30 border border-border p-6 rounded-2xl hover:border-primary/30 transition-all group">
                                     <div className="text-primary font-black text-lg mb-2 group-hover:translate-x-1 transition-transform">Article 226</div>
-                                    <p className="text-sm text-muted-foreground font-medium">Empowers High Courts to issue writs for Fundamental Rights and "any other purpose."</p>
+                                    <p className="text-sm text-muted-foreground font-medium">Empowers High Courts to issue writs for Fundamental Rights and &quot;any other purpose.&quot;</p>
                                 </div>
                             </div>
 

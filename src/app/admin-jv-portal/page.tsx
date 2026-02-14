@@ -5,14 +5,14 @@ import { db } from "@/lib/firebase";
 import { collection, query, orderBy, onSnapshot, deleteDoc, doc, updateDoc } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-import { Trash2, Edit, CheckCircle, Clock, AlertTriangle } from "lucide-react";
+import { Trash2, Edit, Clock, AlertTriangle } from "lucide-react";
 
 interface PIL {
     id: string;
     title: string;
     description: string;
     supporters: number;
-    createdAt: any;
+    createdAt: unknown;
     creatorName?: string;
     status?: string;
     hearingResult?: string;
@@ -20,7 +20,7 @@ interface PIL {
 }
 
 export default function AdminPortal() {
-    const { user, loading: authLoading } = useAuth();
+    const { loading: authLoading } = useAuth();
     const router = useRouter();
     const [pils, setPils] = useState<PIL[]>([]);
     const [loading, setLoading] = useState(true);

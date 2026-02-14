@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /admin-jv-portal
+Disallow: /admin-login
+
+Sitemap: https://janvichar.in/sitemap.xml
