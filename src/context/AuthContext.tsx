@@ -30,7 +30,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
             await signInWithPopup(auth, provider);
         } catch (error) {
-            console.error("Login failed", error);
+            console.error("Login failed:", error);
+            alert("Login failed. Please ensure you are using a valid Google account.");
         }
     };
 
@@ -38,7 +39,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
             await signOut(auth);
         } catch (error) {
-            console.error("Logout failed", error);
+            console.error("Logout failed:", error);
+            alert("Logout failed. Please try again.");
         }
     };
 
