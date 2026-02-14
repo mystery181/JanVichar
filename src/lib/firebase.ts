@@ -12,10 +12,19 @@ const firebaseConfig = {
     appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
 
-// Initialize Firebase
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const storage = getStorage(app);
+// Initialize Firebase only if API key is present
+let app;
+let auth: any;
+let db: any;
+let storage: any;
+
+if (firebaseConfig.apiKey) {
+    app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = getFirestore(app);
+    storage = getStorage(app);
+} else {
+    console.warn("Firebase API Key is missing. Firebase features will not work.");
+}
 
 export { auth, db, storage };
