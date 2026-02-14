@@ -15,6 +15,8 @@ interface PIL {
     createdAt: any;
     creatorName?: string;
     status?: string;
+    hearingResult?: string;
+    hearingDate?: string;
 }
 
 export default function AdminPortal() {
@@ -69,107 +71,150 @@ export default function AdminPortal() {
         }
     };
 
-    if (authLoading || loading) return <div className="container" style={{ padding: "100px 0", textAlign: "center" }}>Loading Admin Portal...</div>;
+    if (authLoading || loading) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[70vh] gap-4">
+                <div className="w-12 h-12 border-4 border-primary border-t-transparent animate-spin rounded-full" />
+                <p className="font-bold text-muted-foreground animate-pulse">Loading Admin Portal...</p>
+            </div>
+        );
+    }
 
     return (
-        <div className="container" style={{ padding: "40px 0" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "30px" }}>
+        <div className="container mx-auto px-4 py-8">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-10 pb-6 border-b border-border">
                 <div>
-                    <h2 style={{ color: "var(--primary-color)" }}>JanVichar Secret Admin Portal</h2>
-                    <p>Full control over all filed PILs</p>
+                    <h2 className="text-3xl font-black tracking-tight text-primary">JanVichar Admin Portal</h2>
+                    <p className="text-muted-foreground font-medium mt-1">Manage filed Public Interest Litigations (PILs)</p>
                 </div>
-                <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                    <div style={{ backgroundColor: "#fde8e8", padding: "10px 20px", borderRadius: "20px", color: "var(--primary-color)", fontWeight: "bold" }}>
-                        Admin Mode Active
+                <div className="flex items-center gap-4">
+                    <div className="bg-destructive/10 text-destructive px-4 py-1.5 rounded-full text-sm font-bold border border-destructive/20 flex items-center gap-2">
+                        <span className="flex h-2 w-2 rounded-full bg-destructive animate-pulse" />
+                        Admin Mode
                     </div>
                     <button
                         onClick={handleAdminLogout}
-                        style={{ background: "#333", color: "white", border: "none", padding: "10px 20px", borderRadius: "20px", cursor: "pointer", fontWeight: "600" }}
+                        className="bg-foreground text-background px-6 py-2 rounded-xl font-bold hover:opacity-90 transition-all active:scale-95 shadow-lg"
                     >
-                        Logout Admin
+                        Sign Out
                     </button>
                 </div>
             </div>
 
-            <div style={{ backgroundColor: "white", borderRadius: "12px", boxShadow: "0 4px 6px rgba(0,0,0,0.1)", overflow: "hidden", border: "1px solid #eee" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
-                    <thead style={{ backgroundColor: "#800000", color: "white" }}>
-                        <tr>
-                            <th style={{ padding: "15px", borderBottom: "1px solid #eee" }}>Title</th>
-                            <th style={{ padding: "15px", borderBottom: "1px solid #eee" }}>Creator</th>
-                            <th style={{ padding: "15px", borderBottom: "1px solid #eee" }}>Supporters</th>
-                            <th style={{ padding: "15px", borderBottom: "1px solid #eee" }}>Status</th>
-                            <th style={{ padding: "15px", borderBottom: "1px solid #eee" }}>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {pils.map((pil) => (
-                            <tr key={pil.id} style={{ borderBottom: "1px solid #f0f0f0", transition: "background 0.2s" }}>
-                                <td style={{ padding: "15px" }}>
-                                    <div style={{ fontWeight: "700", color: "#333", marginBottom: "4px" }}>{pil.title}</div>
-                                    <div style={{ fontSize: "0.75rem", color: "#999", fontFamily: "monospace" }}>ID: {pil.id}</div>
-                                </td>
-                                <td style={{ padding: "15px", color: "#555" }}>{pil.creatorName || "Anonymous"}</td>
-                                <td style={{ padding: "15px", textAlign: "center" }}>
-                                    <span style={{ backgroundColor: "#f0f0f0", padding: "4px 10px", borderRadius: "12px", fontSize: "0.9rem", fontWeight: "600" }}>
-                                        {pil.supporters}
-                                    </span>
-                                </td>
-                                <td style={{ padding: "15px" }}>
-                                    <select
-                                        value={pil.status || "Filed"}
-                                        onChange={(e) => updateStatus(pil.id, e.target.value)}
-                                        style={{
-                                            padding: "8px",
-                                            borderRadius: "6px",
-                                            border: "1px solid #ddd",
-                                            backgroundColor: "#fff",
-                                            cursor: "pointer",
-                                            width: "100%",
-                                            fontSize: "0.9rem"
-                                        }}
-                                    >
-                                        <option value="Filed">Filed</option>
-                                        <option value="Under Review">Under Review</option>
-                                        <option value="Admitted">Admitted</option>
-                                        <option value="Rejected">Rejected</option>
-                                        <option value="Success">Success</option>
-                                    </select>
-                                </td>
-                                <td style={{ padding: "15px" }}>
-                                    <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
-                                        <button
-                                            onClick={() => router.push(`/pil/${pil.id}`)}
-                                            title="View PIL"
-                                            style={{ background: "#f0f0f0", border: "none", cursor: "pointer", color: "#555", padding: "8px", borderRadius: "6px", display: "flex", alignItems: "center" }}
-                                        >
-                                            <Edit size={18} />
-                                        </button>
-                                        <button
-                                            onClick={() => handleDelete(pil.id)}
-                                            title="Delete PIL"
-                                            style={{ background: "#fee2e2", border: "none", cursor: "pointer", color: "#c53030", padding: "8px", borderRadius: "6px", display: "flex", alignItems: "center" }}
-                                        >
-                                            <Trash2 size={18} />
-                                        </button>
-                                    </div>
-                                </td>
+            <div className="bg-card border border-border rounded-3xl overflow-hidden shadow-2xl">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead className="bg-[#800000] text-white">
+                            <tr>
+                                <th className="p-5 font-bold text-sm uppercase tracking-widest whitespace-nowrap">Petition Details</th>
+                                <th className="p-5 font-bold text-sm uppercase tracking-widest whitespace-nowrap">Creator</th>
+                                <th className="p-5 font-bold text-sm uppercase tracking-widest whitespace-nowrap text-center">Support</th>
+                                <th className="p-5 font-bold text-sm uppercase tracking-widest whitespace-nowrap">Status</th>
+                                <th className="p-5 font-bold text-sm uppercase tracking-widest whitespace-nowrap text-center">Actions</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                            {pils.map((pil) => (
+                                <tr key={pil.id} className="hover:bg-muted/30 transition-colors group">
+                                    <td className="p-5">
+                                        <div className="font-black text-foreground mb-1 group-hover:text-primary transition-colors">{pil.title}</div>
+                                        <div className="text-[10px] text-muted-foreground font-mono opacity-50">ID: {pil.id}</div>
+                                    </td>
+                                    <td className="p-5">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold">
+                                                {pil.creatorName?.charAt(0) || "A"}
+                                            </div>
+                                            <span className="text-sm font-bold text-muted-foreground">{pil.creatorName || "Anonymous"}</span>
+                                        </div>
+                                    </td>
+                                    <td className="p-5 text-center">
+                                        <span className="bg-secondary/10 text-secondary px-3 py-1 rounded-full text-sm font-black">
+                                            {pil.supporters}
+                                        </span>
+                                    </td>
+                                    <td className="p-5">
+                                        <div className="space-y-2">
+                                            <select
+                                                value={pil.status || "Filed"}
+                                                onChange={(e) => updateStatus(pil.id, e.target.value)}
+                                                className="w-full bg-background border border-border p-2 rounded-lg text-sm font-bold focus:ring-2 focus:ring-primary/20 outline-none cursor-pointer hover:border-primary/50 transition-all font-mono"
+                                            >
+                                                <option value="Filed">Filed</option>
+                                                <option value="Under Review">Under Review</option>
+                                                <option value="Admitted">Admitted</option>
+                                                <option value="Hearing">Hearing</option>
+                                                <option value="Heard">Heard (Concluded)</option>
+                                                <option value="Rejected">Rejected</option>
+                                                <option value="Success">Success</option>
+                                            </select>
+
+                                            {pil.status === "Heard" && (
+                                                <div className="space-y-2">
+                                                    <textarea
+                                                        placeholder="Enter hearing result..."
+                                                        defaultValue={pil.hearingResult || ""}
+                                                        onBlur={(e) => updateDoc(doc(db, "pils", pil.id), { hearingResult: e.target.value })}
+                                                        className="w-full text-[10px] p-2 bg-muted/50 border border-border rounded-md font-medium"
+                                                        rows={2}
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Result Date (e.g. 15 Oct 2026)"
+                                                        defaultValue={pil.hearingDate || ""}
+                                                        onBlur={(e) => updateDoc(doc(db, "pils", pil.id), { hearingDate: e.target.value })}
+                                                        className="w-full text-[10px] p-2 bg-muted/50 border border-border rounded-md font-mono"
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td className="p-5">
+                                        <div className="flex items-center justify-center gap-3">
+                                            <button
+                                                onClick={() => router.push(`/pil/${pil.id}`)}
+                                                className="p-2.5 bg-muted text-foreground hover:bg-primary/10 hover:text-primary rounded-xl transition-all active:scale-90"
+                                                title="View/Edit Details"
+                                            >
+                                                <Edit size={18} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(pil.id)}
+                                                className="p-2.5 bg-destructive/10 text-destructive hover:bg-destructive hover:text-white rounded-xl transition-all active:scale-90"
+                                                title="Delete PIL"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
                 {pils.length === 0 && (
-                    <div style={{ padding: "40px", textAlign: "center", color: "#666" }}>
-                        No PILs found in the database.
+                    <div className="p-20 text-center flex flex-col items-center gap-4">
+                        <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center text-muted-foreground/30">
+                            <Clock size={32} />
+                        </div>
+                        <div className="space-y-1">
+                            <h3 className="text-xl font-bold">Safe Base Clean</h3>
+                            <p className="text-muted-foreground text-sm">No PILs currently found in the database system.</p>
+                        </div>
                     </div>
                 )}
             </div>
 
-            <div style={{ marginTop: "40px", padding: "20px", backgroundColor: "#fff5f5", borderRadius: "10px", border: "1px solid #fed7d7" }}>
-                <h4 style={{ color: "#c53030", marginTop: 0 }}>Admin Responsibility</h4>
-                <p style={{ fontSize: "0.9rem", color: "#666" }}>
-                    You have full power to delete and modify records. Use this authority carefully as actions in this portal directly affect the live database and public displays.
-                </p>
+            <div className="mt-12 p-8 bg-destructive/5 border border-destructive/10 rounded-3xl flex flex-col sm:flex-row items-center gap-6">
+                <div className="w-16 h-16 bg-destructive/10 rounded-2xl flex items-center justify-center text-destructive shrink-0">
+                    <AlertTriangle size={32} />
+                </div>
+                <div className="space-y-2">
+                    <h4 className="text-xl font-black text-destructive">Administrative Safeguards</h4>
+                    <p className="text-sm text-muted-foreground leading-relaxed max-w-3xl font-medium">
+                        You have full authority to modify and remove records from the core database. Please exercise extreme caution, as deletions are permanent and status updates are visible to the public in real-time.
+                    </p>
+                </div>
             </div>
         </div>
     );
