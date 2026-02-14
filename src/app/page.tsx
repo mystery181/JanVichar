@@ -10,8 +10,7 @@ import {
   FileText,
   Zap,
   CheckCircle2,
-  ExternalLink,
-  MessageSquare
+  ExternalLink
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -156,7 +155,7 @@ export default function Home() {
           <div className="text-center max-w-3xl mx-auto mb-16">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">A Modern Legal Toolkit</h2>
             <p className="text-muted-foreground text-lg italic">
-              "Ensuring justice is not a privilege, but a right accessible to every Indian."
+              &quot;Ensuring justice is not a privilege, but a right accessible to every Indian.&quot;
             </p>
           </div>
 

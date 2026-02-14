@@ -15,7 +15,7 @@ export default function PrivacyPolicy() {
                     <section style={{ marginBottom: "30px" }}>
                         <h3 style={{ color: "var(--primary-color)", marginBottom: "15px" }}>1. Introduction</h3>
                         <p>
-                            JanVichar ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how
+                            JanVichar (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;) is committed to protecting your privacy. This Privacy Policy explains how
                             we collect, use, and protect your information when you use our platform to file or support Public Interest Litigations (PILs).
                         </p>
                     </section>

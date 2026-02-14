@@ -53,9 +53,9 @@ export default function CreatePIL() {
             const result = await model.generateContent(prompt);
             const response = await result.response;
             setValidation(response.text());
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Validation failed", error);
-            if (error?.message?.includes("404")) {
+            if (error instanceof Error && error.message?.includes("404")) {
                 setValidation("AI validation is currently undergoing maintenance. Please proceed with your draft.");
             } else {
                 setValidation("Could not validate at this time. Our AI assistant is currently over-taxed. Please proceed manually.");
@@ -265,8 +265,8 @@ export default function CreatePIL() {
                                     <div className="max-w-xs">
                                         <h3 className="font-bold mb-1">AI Feedback Pending</h3>
                                         <p className="text-xs text-muted-foreground leading-relaxed">
-                                            Complete the title and description, then click "AI Validate"
-                                            to get instant suggestions on your petition's strength.
+                                            Complete the title and description, then click &quot;AI Validate&quot;
+                                            to get instant suggestions on your petition&apos;s strength.
                                         </p>
                                     </div>
                                 </motion.div>

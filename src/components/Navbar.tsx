@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
 
 const Navbar = () => {
     const { user, login, logout } = useAuth();
@@ -54,7 +55,7 @@ const Navbar = () => {
             <div className="container mx-auto px-4 flex items-center justify-between">
                 <Link href="/" className="flex items-center gap-2 group">
                     <div className="relative w-10 h-10 overflow-hidden transition-transform group-hover:scale-110">
-                        <img src="/logo.png" alt="JanVichar Logo" className="object-contain w-full h-full" />
+                        <Image src="/logo.png" alt="JanVichar Logo" fill className="object-contain" />
                     </div>
                     <span className="text-2xl font-bold tracking-tight text-primary">
                         Jan<span className="text-secondary">Vichar</span>

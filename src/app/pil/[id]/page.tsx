@@ -108,8 +108,8 @@ export default function PILDetail() {
             let result;
             try {
                 result = await model.generateContent(prompt);
-            } catch (innerError: any) {
-                if (innerError?.message?.includes("404")) {
+            } catch (innerError: unknown) {
+                if (innerError instanceof Error && innerError.message?.includes("404")) {
                     console.warn("gemini-1.5-flash not found, falling back to gemini-pro");
                     model = genAI.getGenerativeModel({ model: "gemini-pro" });
                     result = await model.generateContent(prompt);
@@ -126,9 +126,9 @@ export default function PILDetail() {
             } else {
                 throw new Error("Empty response from AI");
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("AI Summarization failed:", error);
-            const errorMessage = error?.message || "Unknown error";
+            const errorMessage = error instanceof Error ? error.message : "Unknown error";
             setSummary(`Could not generate summary (Error: ${errorMessage.substring(0, 50)}). Please read the full statement below.`);
         } finally {
             setSummarizing(false);
@@ -376,7 +376,7 @@ export default function PILDetail() {
                                 </div>
                                 <div className="bg-white/10 backdrop-blur-md rounded-3xl p-8 border border-white/20">
                                     <p className="text-xl font-medium leading-relaxed italic">
-                                        "{pil.hearingResult}"
+                                        &quot;{pil.hearingResult}&quot;
                                     </p>
                                     {pil.hearingDate && (
                                         <div className="mt-6 flex items-center gap-2 text-sm font-bold text-blue-100">
