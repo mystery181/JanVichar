@@ -12,10 +12,12 @@ import {
   CheckCircle2,
   ExternalLink
 } from "lucide-react";
+import { useLanguage } from "@/context/LanguageContext";
 import { cn } from "@/lib/utils";
 
 export default function Home() {
   const { user, login } = useAuth();
+  const { t } = useLanguage();
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -37,29 +39,29 @@ export default function Home() {
 
   const features = [
     {
-      title: "AI-Powered Drafting",
-      description: "Gemini-powered suggestions to refine legal language and strengthen your petition.",
+      title: t("features.ai_drafting"),
+      description: t("features.ai_desc"),
       icon: Zap,
       color: "text-amber-500",
       bg: "bg-amber-500/10"
     },
     {
-      title: "Collaborative Democracy",
-      description: "Work with other citizens to crowdsource evidence and support for public causes.",
+      title: t("features.collaboration"),
+      description: t("features.collaboration_desc"),
       icon: Users,
       color: "text-indigo-500",
       bg: "bg-indigo-500/10"
     },
     {
-      title: "Real-time Tracking",
-      description: "Monitor the status of your PIL from filing to final verdict with live updates.",
+      title: t("features.tracking"),
+      description: t("features.tracking_desc"),
       icon: CheckCircle2,
       color: "text-green-500",
       bg: "bg-green-500/10"
     },
     {
-      title: "Professional Exports",
-      description: "Generate court-ready PDF documents instantly with verified formatting.",
+      title: t("features.exports"),
+      description: t("features.exports_desc"),
       icon: FileText,
       color: "text-primary",
       bg: "bg-primary/10"
@@ -90,18 +92,13 @@ export default function Home() {
               className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 backdrop-blur-md border border-white/10 text-xs md:text-sm font-semibold mb-8 text-indigo-200"
             >
               <span className="flex h-2 w-2 rounded-full bg-secondary animate-pulse" />
-              Empowering 1.4 Billion Voices
+              {t("hero.empower_badge")}
             </motion.div>
 
-            <h1 className="text-5xl md:text-7xl lg:text-8xl font-black tracking-tight mb-8 leading-[0.95] bg-clip-text text-transparent bg-gradient-to-b from-white to-white/70">
-              Jan Vichar – जन विचार
-              <span className="block text-secondary mt-4 drop-shadow-sm">Civic Action, Simplified.</span>
+            <h1 className="text-5xl md:text-7xl lg:text-8xl font-black tracking-tight mb-8 leading-[1.2] bg-clip-text text-transparent bg-gradient-to-b from-white to-white/70 py-2">
+              {t("hero.title")}
+              <span className="block text-secondary mt-4 drop-shadow-sm">{t("hero.subtitle")}</span>
             </h1>
-
-            <p className="text-xl md:text-2xl text-indigo-100/80 mb-12 max-w-2xl mx-auto leading-relaxed font-medium">
-              The first collaborative platform for Indian citizens to draft, discuss, and file
-              <span className="text-white border-b-2 border-secondary/50 mx-1">Public Interest Litigations</span> using AI assistance.
-            </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
               {user ? (
@@ -109,7 +106,7 @@ export default function Home() {
                   href="/create-pil"
                   className="group w-full sm:w-auto flex items-center justify-center gap-3 bg-secondary hover:bg-secondary/90 text-white px-10 py-5 rounded-2xl font-bold text-xl shadow-2xl shadow-secondary/30 transition-all hover:-translate-y-1 hover:shadow-secondary/40 active:scale-95"
                 >
-                  Start a New PIL
+                  {t("hero.start_button")}
                   <ArrowRight size={22} className="group-hover:translate-x-1 transition-transform" />
                 </Link>
               ) : (
@@ -117,7 +114,7 @@ export default function Home() {
                   onClick={login}
                   className="group w-full sm:w-auto flex items-center justify-center gap-3 bg-secondary hover:bg-secondary/90 text-white px-10 py-5 rounded-2xl font-bold text-xl shadow-2xl shadow-secondary/30 transition-all hover:-translate-y-1 hover:shadow-secondary/40 active:scale-95"
                 >
-                  Start a New PIL
+                  {t("hero.start_button")}
                   <ArrowRight size={22} className="group-hover:translate-x-1 transition-transform" />
                 </button>
               )}
@@ -125,7 +122,7 @@ export default function Home() {
                 href="/tracker"
                 className="w-full sm:w-auto flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 backdrop-blur-xl border border-white/10 text-white px-10 py-5 rounded-2xl font-bold text-xl transition-all hover:bg-white/15"
               >
-                Browse Cases
+                {t("nav.tracker")}
               </Link>
             </div>
 
@@ -153,7 +150,7 @@ export default function Home() {
       <section className="py-24 bg-background">
         <div className="container mx-auto px-4">
           <div className="text-center max-w-3xl mx-auto mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">A Modern Legal Toolkit</h2>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">{t("features.title")}</h2>
             <p className="text-muted-foreground text-lg italic">
               &quot;Ensuring justice is not a privilege, but a right accessible to every Indian.&quot;
             </p>
@@ -190,16 +187,15 @@ export default function Home() {
         <div className="container mx-auto px-4">
           <div className="flex flex-col lg:flex-row items-center justify-between gap-12">
             <div className="max-w-xl">
-              <h2 className="text-3xl md:text-4xl font-bold mb-6">Recent Public Interest Litigations</h2>
+              <h2 className="text-3xl md:text-4xl font-bold mb-6">{t("home_recent.title")}</h2>
               <p className="text-muted-foreground text-lg mb-8">
-                Every petition starts with a single voice. Join thousands of citizens who are
-                already making a difference in their communities.
+                {t("home_recent.subtitle")}
               </p>
               <div className="space-y-4 mb-8">
                 {[
-                  "Protection of urban wetlands in Bangalore",
-                  "Digital literacy programs for rural farmers",
-                  "Air quality monitoring in manufacturing hubs"
+                  t("home_recent.sample_1"),
+                  t("home_recent.sample_2"),
+                  t("home_recent.sample_3")
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-3">
                     <div className="bg-primary/10 p-1 rounded-full text-primary">
@@ -213,7 +209,7 @@ export default function Home() {
                 href="/tracker"
                 className="inline-flex items-center gap-2 text-primary font-bold hover:underline"
               >
-                Explore all active cases
+                {t("home_recent.explore_all")}
                 <ExternalLink size={18} />
               </Link>
             </div>
@@ -242,8 +238,8 @@ export default function Home() {
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-12 bg-white dark:bg-zinc-800 p-4 rounded-xl shadow-2xl border flex items-center gap-4 animate-bounce">
                   <Zap className="text-amber-500" size={32} />
                   <div>
-                    <div className="text-xs text-muted-foreground uppercase font-bold">AI Suggestion</div>
-                    <div className="font-bold">Summary Optimized</div>
+                    <div className="text-xs text-muted-foreground uppercase font-bold">{t("home_recent.ai_suggestion")}</div>
+                    <div className="font-bold">{t("home_recent.optimized")}</div>
                   </div>
                 </div>
               </div>

@@ -17,6 +17,7 @@ import {
     SearchX,
     Plus
 } from "lucide-react";
+import { useLanguage } from "@/context/LanguageContext";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -32,6 +33,7 @@ interface PIL {
 }
 
 export default function Tracker() {
+    const { t } = useLanguage();
     const [pils, setPils] = useState<PIL[]>([]);
     const [loading, setLoading] = useState(true);
     const [sortBy, setSortBy] = useState("newest");
@@ -80,9 +82,9 @@ export default function Tracker() {
         });
 
     const sortTabs = [
-        { id: "trending", label: "Trending", icon: TrendingUp },
-        { id: "hot", label: "Hot", icon: Flame },
-        { id: "newest", label: "Newest", icon: Clock },
+        { id: "trending", label: t("tracker.trending"), icon: TrendingUp },
+        { id: "hot", label: t("tracker.hot"), icon: Flame },
+        { id: "newest", label: t("tracker.newest"), icon: Clock },
     ];
 
     const getStatusStyles = (status: string) => {
@@ -103,16 +105,16 @@ export default function Tracker() {
                 <div className="container mx-auto px-4">
                     <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                         <div className="space-y-2">
-                            <h1 className="text-3xl md:text-4xl font-bold tracking-tight">PIL Discovery</h1>
+                            <h1 className="text-3xl md:text-4xl font-bold tracking-tight">{t("tracker.title")}</h1>
                             <p className="text-muted-foreground text-lg">
-                                Explore and support public interest litigations across India.
+                                {t("tracker.description")}
                             </p>
                         </div>
                         <div className="relative max-w-md w-full">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={20} />
                             <input
                                 type="text"
-                                placeholder="Search PILs..."
+                                placeholder={t("tracker.search_placeholder")}
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 className="w-full pl-10 pr-4 py-3 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
@@ -145,7 +147,7 @@ export default function Tracker() {
 
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Filter size={16} />
-                        <span>Showing {filteredPils.length} {filteredPils.length === 1 ? "petition" : "petitions"}</span>
+                        <span>{t("tracker.showing_count")} {filteredPils.length}</span>
                     </div>
                 </div>
 
@@ -198,7 +200,7 @@ export default function Tracker() {
                                                 <UserIcon size={14} />
                                             </div>
                                             <div className="flex flex-col">
-                                                <span className="text-xs font-bold leading-none">{pil.creatorName || "Anonymous Voter"}</span>
+                                                <span className="text-xs font-bold">{pil.creatorName || "Anonymous Voter"}</span>
                                                 <span className="text-[10px] text-muted-foreground">Citizen Petitioner</span>
                                             </div>
                                         </div>
@@ -215,7 +217,7 @@ export default function Tracker() {
                                             href={`/pil/${pil.id}`}
                                             className="flex items-center gap-1 text-sm font-bold text-primary hover:underline group/link"
                                         >
-                                            View Details
+                                            {t("tracker.view_details")}
                                             <ChevronRight size={16} className="group-hover/link:translate-x-1 transition-transform" />
                                         </Link>
                                     </div>
@@ -229,15 +231,15 @@ export default function Tracker() {
                             <SearchX size={32} />
                         </div>
                         <div className="space-y-1">
-                            <h3 className="text-xl font-bold">No results found</h3>
-                            <p className="text-muted-foreground">Try adjusting your search or filters to find what you're looking for.</p>
+                            <h3 className="text-xl font-bold">{t("tracker.no_results")}</h3>
+                            <p className="text-muted-foreground">Try adjusting your search or filters to find what you&apos;re looking for.</p>
                         </div>
                         <Link
                             href="/create-pil"
                             className="mt-4 flex items-center gap-2 bg-primary text-white px-6 py-2 rounded-xl font-bold"
                         >
                             <Plus size={20} />
-                            Start New Petition
+                            {t("tracker.start_petition")}
                         </Link>
                     </div>
                 )}

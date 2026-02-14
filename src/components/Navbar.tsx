@@ -4,6 +4,8 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
+import { Language } from "@/lib/translations";
 import { cn } from "@/lib/utils";
 import {
     Menu,
@@ -16,7 +18,9 @@ import {
     PlusCircle,
     Home,
     Info,
-    Scale
+    Scale,
+    Languages,
+    ChevronDown
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { motion, AnimatePresence } from "framer-motion";
@@ -24,11 +28,14 @@ import Image from "next/image";
 
 const Navbar = () => {
     const { user, login, logout } = useAuth();
+    const { language, setLanguage, t } = useLanguage();
     const pathname = usePathname();
     const { theme, setTheme } = useTheme();
     const [isOpen, setIsOpen] = React.useState(false);
     const [scrolled, setScrolled] = React.useState(false);
     const [mounted, setMounted] = React.useState(false);
+    const [langOpen, setLangOpen] = React.useState(false);
+    const [profileOpen, setProfileOpen] = React.useState(false);
 
     React.useEffect(() => {
         setMounted(true);
@@ -38,9 +45,9 @@ const Navbar = () => {
     }, []);
 
     const navLinks = [
-        { name: "Home", href: "/", icon: Home },
-        { name: "About", href: "/learn", icon: Info },
-        { name: "Tracker", href: "/tracker", icon: Scale },
+        { name: t("nav.home"), href: "/", icon: Home },
+        { name: t("nav.about"), href: "/learn", icon: Info },
+        { name: t("nav.tracker"), href: "/tracker", icon: Scale },
     ];
 
     return (
@@ -82,6 +89,43 @@ const Navbar = () => {
                     <div className="h-6 w-px bg-border" />
 
                     <div className="flex items-center gap-4">
+                        <div className="relative">
+                            <button
+                                onClick={() => setLangOpen(!langOpen)}
+                                className="flex items-center gap-2 p-2 rounded-full hover:bg-muted transition-colors text-sm font-bold"
+                            >
+                                <Languages size={20} />
+                                <span className="uppercase">{language.substring(0, 2)}</span>
+                                <ChevronDown size={14} className={cn("transition-transform", langOpen && "rotate-180")} />
+                            </button>
+                            <AnimatePresence>
+                                {langOpen && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: 10 }}
+                                        className="absolute right-0 mt-2 w-32 bg-background border border-border rounded-xl shadow-xl overflow-hidden z-50"
+                                    >
+                                        {(['hinglish', 'english', 'hindi'] as Language[]).map((lang) => (
+                                            <button
+                                                key={lang}
+                                                onClick={() => {
+                                                    setLanguage(lang);
+                                                    setLangOpen(false);
+                                                }}
+                                                className={cn(
+                                                    "w-full px-4 py-2 text-left text-sm hover:bg-muted transition-colors capitalize",
+                                                    language === lang ? "text-primary font-bold bg-primary/5" : "text-muted-foreground"
+                                                )}
+                                            >
+                                                {lang}
+                                            </button>
+                                        ))}
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+
                         <button
                             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
                             className="p-2 rounded-full hover:bg-muted transition-colors"
@@ -94,22 +138,66 @@ const Navbar = () => {
                             <div className="flex items-center gap-4">
                                 <Link
                                     href="/create-pil"
-                                    className="flex items-center gap-2 bg-secondary hover:bg-secondary/90 text-white px-4 py-2 rounded-lg font-semibold transition-all hover:shadow-lg active:scale-95"
+                                    className="hidden lg:flex items-center gap-2 bg-secondary hover:bg-secondary/90 text-white px-4 py-2 rounded-lg font-semibold transition-all hover:shadow-lg active:scale-95"
                                 >
                                     <PlusCircle size={18} />
-                                    <span>File PIL</span>
+                                    <span>{t("nav.file_pil")}</span>
                                 </Link>
-                                <div className="flex items-center gap-3 pl-2 border-l border-border">
-                                    <div className="flex flex-col items-end">
-                                        <span className="text-xs text-muted-foreground">Welcome</span>
-                                        <span className="text-sm font-bold">{user.displayName?.split(" ")[0]}</span>
-                                    </div>
+
+                                <div className="relative">
                                     <button
-                                        onClick={logout}
-                                        className="p-2 text-muted-foreground hover:text-destructive transition-colors"
+                                        onClick={() => setProfileOpen(!profileOpen)}
+                                        className="flex items-center gap-3 p-1.5 rounded-full hover:bg-muted transition-colors border border-border"
                                     >
-                                        <LogOut size={20} />
+                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                                            <User size={18} />
+                                        </div>
+                                        <div className="hidden sm:flex flex-col items-start pr-2">
+                                            <span className="text-[10px] text-muted-foreground leading-tight">{t("nav.profile")}</span>
+                                            <span className="text-sm font-bold leading-tight">{user.displayName?.split(" ")[0]}</span>
+                                        </div>
+                                        <ChevronDown size={14} className={cn("transition-transform mr-1", profileOpen && "rotate-180")} />
                                     </button>
+
+                                    <AnimatePresence>
+                                        {profileOpen && (
+                                            <motion.div
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0, y: 10 }}
+                                                className="absolute right-0 mt-2 w-56 bg-background border border-border rounded-2xl shadow-2xl overflow-hidden z-50 p-2 space-y-1"
+                                            >
+                                                <div className="px-3 py-2 border-b mb-1">
+                                                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{t("profile.stats_title")}</p>
+                                                    <p className="text-sm font-bold truncate">{user.email}</p>
+                                                </div>
+                                                <Link
+                                                    href="/profile"
+                                                    onClick={() => setProfileOpen(false)}
+                                                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-primary/5 hover:text-primary transition-colors text-sm font-medium"
+                                                >
+                                                    <User size={18} />
+                                                    {t("nav.profile")}
+                                                </Link>
+                                                <Link
+                                                    href="/profile#pils"
+                                                    onClick={() => setProfileOpen(false)}
+                                                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-primary/5 hover:text-primary transition-colors text-sm font-medium"
+                                                >
+                                                    <Scale size={18} />
+                                                    {t("profile.my_pils")}
+                                                </Link>
+                                                <div className="h-px bg-border my-1" />
+                                                <button
+                                                    onClick={() => { logout(); setProfileOpen(false); }}
+                                                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-destructive/5 hover:text-destructive transition-colors text-sm font-medium"
+                                                >
+                                                    <LogOut size={18} />
+                                                    {t("nav.logout")}
+                                                </button>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
                                 </div>
                             </div>
                         ) : (
@@ -117,16 +205,16 @@ const Navbar = () => {
                                 onClick={login}
                                 className="bg-primary hover:bg-primary/90 text-white px-6 py-2 rounded-lg font-semibold transition-all hover:shadow-lg active:scale-95"
                             >
-                                Login
+                                {t("nav.login")}
                             </button>
                         )}
 
                         <Link
                             href="/admin-login"
-                            className="bg-primary/10 hover:bg-primary/20 text-primary px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-widest transition-all border border-primary/20 flex items-center gap-2 hover:shadow-sm"
+                            className="hidden xl:flex bg-primary/10 hover:bg-primary/20 text-primary px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-widest transition-all border border-primary/20 items-center gap-2 hover:shadow-sm"
                         >
-                            <User size={14} />
-                            Admin Portal
+                            <Scale size={14} />
+                            {t("nav.admin")}
                         </Link>
                     </div>
                 </div>
@@ -182,19 +270,30 @@ const Navbar = () => {
                             {user ? (
                                 <div className="flex flex-col gap-3">
                                     <Link
+                                        href="/profile"
+                                        onClick={() => setIsOpen(false)}
+                                        className="flex items-center justify-between p-3 rounded-lg font-medium bg-muted"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <User size={20} />
+                                            {t("nav.profile")}
+                                        </div>
+                                        <ChevronRight size={18} />
+                                    </Link>
+                                    <Link
                                         href="/create-pil"
                                         onClick={() => setIsOpen(false)}
                                         className="flex items-center justify-center gap-2 bg-secondary text-white p-3 rounded-lg font-bold"
                                     >
                                         <PlusCircle size={20} />
-                                        File PIL
+                                        {t("nav.file_pil")}
                                     </Link>
                                     <button
                                         onClick={() => { logout(); setIsOpen(false); }}
                                         className="flex items-center justify-center gap-2 border border-border p-3 rounded-lg font-bold text-muted-foreground"
                                     >
                                         <LogOut size={20} />
-                                        Logout
+                                        {t("nav.logout")}
                                     </button>
                                 </div>
                             ) : (
@@ -202,7 +301,7 @@ const Navbar = () => {
                                     onClick={() => { login(); setIsOpen(false); }}
                                     className="bg-primary text-white p-3 rounded-lg font-bold"
                                 >
-                                    Login with Google
+                                    {t("nav.login")}
                                 </button>
                             )}
 
@@ -211,7 +310,7 @@ const Navbar = () => {
                                 onClick={() => setIsOpen(false)}
                                 className="flex items-center justify-center gap-2 p-3 rounded-lg font-bold text-xs uppercase tracking-widest text-muted-foreground border border-border hover:bg-muted"
                             >
-                                Admin Portal
+                                {t("nav.admin")}
                             </Link>
                         </div>
                     </motion.div>
