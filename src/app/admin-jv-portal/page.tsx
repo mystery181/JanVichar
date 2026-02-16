@@ -17,6 +17,9 @@ interface PIL {
     category?: string;
     location?: { state: string; city: string };
     urgency?: string;
+    status?: string;
+    hearingResult?: string;
+    hearingDate?: string;
 }
 
 export default function AdminPortal() {
