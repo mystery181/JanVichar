@@ -4,28 +4,16 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { db, storage } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp, query, where, getDocs, limit } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, query, where, getDocs, limit, updateDoc, doc } from "firebase/firestore";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { useRouter } from "next/navigation";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { generateEmbedding, cosineSimilarity } from "@/lib/gemini";
 import {
-    Zap,
-    Send,
-    AlertCircle,
-    ChevronLeft,
-    Sparkles,
-    Info,
-    CheckCircle2,
-    FileText,
-    Link as LinkIcon,
-    HelpCircle,
-    ArrowRight,
-    ChevronRight,
-    Search,
-    Upload,
-    X,
-    File,
-    Image as ImageIcon
+    Zap, Send, AlertCircle, ChevronLeft, Sparkles, Info, CheckCircle2,
+    FileText, Link as LinkIcon, HelpCircle, ArrowRight, ChevronRight,
+    Search, Upload, X, File, Image as ImageIcon, MapPin, Filter, Clock,
+    Users, Paperclip, UploadCloud, ShieldAlert, Flame, MessageSquare
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -33,6 +21,7 @@ import Link from "next/link";
 
 interface PIL {
     id: string;
+    pilId: string;
     title: string;
     description: string;
     supporters: number;
@@ -40,6 +29,7 @@ interface PIL {
     creatorName?: string;
     status?: string;
     evidenceFiles?: { name: string; url: string; type: string }[];
+    embedding?: number[];
 }
 
 export default function CreatePIL() {
@@ -47,8 +37,19 @@ export default function CreatePIL() {
     const { t } = useLanguage();
     const router = useRouter();
     const [title, setTitle] = useState("");
-    const [description, setDescription] = useState("");
-    const [evidence, setEvidence] = useState("");
+    const [category, setCategory] = useState("Public Safety");
+    const [stateLocation, setStateLocation] = useState("");
+    const [city, setCity] = useState("");
+    const [sinceWhen, setSinceWhen] = useState("");
+    const [affectedGroup, setAffectedGroup] = useState("");
+    const [publicHealth, setPublicHealth] = useState("No");
+    const [urgency, setUrgency] = useState("Low");
+    const [complaintFiled, setComplaintFiled] = useState("No");
+
+    // Existing detailed state
+    const [description, setDescription] = useState(""); // "What is the problem?"
+    const [evidenceDescription, setEvidenceDescription] = useState(""); // "What proof do you have?" (renamed from evidence to clarify)
+
     const [loading, setLoading] = useState(false);
     const [validation, setValidation] = useState("");
     const [validating, setValidating] = useState(false);
@@ -57,46 +58,137 @@ export default function CreatePIL() {
     const [files, setFiles] = useState<File[]>([]);
     const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
     const [uploading, setUploading] = useState(false);
+    const [step, setStep] = useState(1);
+    const [duplicateScore, setDuplicateScore] = useState(0);
+    const [draftRestored, setDraftRestored] = useState(false);
+
+    // Restore draft from localStorage on mount
+    useEffect(() => {
+        try {
+            const saved = localStorage.getItem("pil_draft");
+            if (saved) {
+                const draft = JSON.parse(saved);
+                if (draft.title) setTitle(draft.title);
+                if (draft.category) setCategory(draft.category);
+                if (draft.stateLocation) setStateLocation(draft.stateLocation);
+                if (draft.city) setCity(draft.city);
+
+                if (draft.description) setDescription(draft.description);
+                if (draft.sinceWhen) setSinceWhen(draft.sinceWhen);
+                if (draft.affectedGroup) setAffectedGroup(draft.affectedGroup);
+                if (draft.evidenceDescription) setEvidenceDescription(draft.evidenceDescription);
+                if (draft.publicHealth) setPublicHealth(draft.publicHealth);
+                if (draft.urgency) setUrgency(draft.urgency);
+                if (draft.complaintFiled) setComplaintFiled(draft.complaintFiled);
+
+                if (draft.step) setStep(draft.step);
+                setDraftRestored(true);
+                setTimeout(() => setDraftRestored(false), 4000);
+            }
+        } catch { }
+    }, []);
+
+    // Auto-save draft to localStorage
+    useEffect(() => {
+        const draftData = {
+            title, category, stateLocation, city,
+            description, sinceWhen, affectedGroup, evidenceDescription,
+            publicHealth, urgency, complaintFiled, step
+        };
+        if (title || description || city) {
+            localStorage.setItem("pil_draft", JSON.stringify(draftData));
+        }
+    }, [title, category, stateLocation, city, description, sinceWhen, affectedGroup, evidenceDescription, publicHealth, urgency, complaintFiled, step]);
 
     useEffect(() => {
-        if (title.length < 5) {
+        if (description.length < 20) {
             setDuplicates([]);
+            setDuplicateScore(0);
             return;
         }
 
         const timeoutId = setTimeout(async () => {
             setSearchingDuplicates(true);
             try {
-                // Simplified duplicate check: search for existing PILs with similar titles
-                const q = query(collection(db, "pils"), limit(50));
-                const snapshot = await getDocs(q);
-                const matching = snapshot.docs
-                    .map(doc => {
-                        const data = doc.data();
-                        return {
-                            id: doc.id,
-                            title: data.title || "",
-                            description: data.description || "",
-                            supporters: data.supporters || 0,
-                            createdAt: data.createdAt || null,
-                            status: data.status || "Filed"
-                        } as PIL;
+                // Fetch PILs and generate current embedding in parallel
+                // Increase limit to scan more PILs for duplicates
+                const q = query(collection(db, "pils"), limit(100));
+
+                // Construct the full text for embedding to match storage logic
+                const currentText = `${title} ${description} ${category} ${stateLocation} ${city}`;
+
+                const [currentEmbedding, snapshot] = await Promise.all([
+                    generateEmbedding(currentText),
+                    getDocs(q)
+                ]);
+
+                // Split PILs into those with/without embeddings
+                const withEmbedding: { id: string; data: any; embedding: number[] }[] = [];
+                const needsEmbedding: { id: string; data: any }[] = [];
+
+                snapshot.docs.forEach(docSnap => {
+                    const data = docSnap.data();
+                    if (data.embedding) {
+                        withEmbedding.push({ id: docSnap.id, data, embedding: data.embedding });
+                    } else if (data.description) {
+                        needsEmbedding.push({ id: docSnap.id, data });
+                    }
+                });
+
+                // Generate missing embeddings in parallel (fast!) + cache them to Firestore
+                const embeddingResults = await Promise.allSettled(
+                    needsEmbedding.map(async (pil) => {
+                        // Use full text for consistent embedding
+                        const pilText = `${pil.data.title || ""} ${pil.data.description} ${pil.data.category || ""} ${pil.data.location?.state || ""} ${pil.data.location?.city || ""}`;
+                        // Cache back to Firestore so future checks are instant
+                        try {
+                            const emb = await generateEmbedding(pilText);
+                            updateDoc(doc(db, "pils", pil.id), { embedding: emb }).catch(e => console.warn("Failed to cache embedding", e));
+                            return { ...pil, embedding: emb };
+                        } catch (e) {
+                            console.warn("Skipping embedding generation for", pil.id, e);
+                            return null;
+                        }
                     })
-                    .filter(pil =>
-                        pil.title.toLowerCase().includes(title.toLowerCase()) ||
-                        title.toLowerCase().includes(pil.title.toLowerCase())
-                    )
-                    .slice(0, 3);
-                setDuplicates(matching);
+                );
+
+                // Combine all PILs with embeddings
+                const allPils = [
+                    ...withEmbedding,
+                    ...embeddingResults
+                        .filter((r): r is PromiseFulfilledResult<{ id: string; data: any; embedding: number[] } | null> => r.status === "fulfilled")
+                        .map(r => r.value)
+                        .filter((r): r is { id: string; data: any; embedding: number[] } => r !== null)
+                ];
+
+                // Find the most similar
+                let maxScore = 0;
+                let mostSimilar: PIL | null = null;
+
+                for (const pil of allPils) {
+                    const score = cosineSimilarity(currentEmbedding, pil.embedding);
+                    if (score > maxScore) {
+                        maxScore = score;
+                        mostSimilar = { id: pil.id, ...pil.data } as PIL;
+                    }
+                }
+
+                if (maxScore > 0.6) {
+                    setDuplicates(mostSimilar ? [mostSimilar] : []);
+                    setDuplicateScore(maxScore);
+                } else {
+                    setDuplicates([]);
+                    setDuplicateScore(0);
+                }
             } catch (error) {
                 console.error("Error searching duplicates:", error);
             } finally {
                 setSearchingDuplicates(false);
             }
-        }, 500);
+        }, 1000);
 
         return () => clearTimeout(timeoutId);
-    }, [title]);
+    }, [title, category, stateLocation, city, description, sinceWhen, affectedGroup, evidenceDescription]);
 
     const validatePIL = async () => {
         if (!title || !description) return;
@@ -105,18 +197,26 @@ export default function CreatePIL() {
         try {
             console.log("Starting AI validation with gemini-1.5-flash...");
             const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY || "");
-            // Use gemini-1.5-flash as it's the newer standard
-            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+            // Use gemini-2.5-flash (free tier available)
+            const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
             const prompt = `You are a legal expert helping a citizen refine a Public Interest Litigation (PIL). 
-            Validate this PIL for completeness, legal tone, and clarity. Suggest 3 specific improvements.
-            Also, if the following content looks like a duplicate of existing issues, mention it.
+            Validate this PIL for clarity and impact.
+            
+            Output strictly in this format:
+            1. **Strength**: One sentence on what is good.
+            2. **Weakness**: One critical gap (if any).
+            3. **Improvement**: One specific actionable suggestion.
+            
+            Keep it extremely concise (under 50 words total).
             
             Title: ${title}
+            Category: ${category}
+            Location: ${stateLocation}, ${city}
             Description: ${description}
-            Evidence: ${evidence}
-            
-            Format your response in professional markdown with clear sections. Use ${t("hero.title")} as a reference for the platform name.`;
+            Since When: ${sinceWhen}
+            Affected Group: ${affectedGroup}
+            Evidence Description: ${evidenceDescription}`;
 
             const result = await model.generateContent(prompt);
             const response = await result.response;
@@ -179,19 +279,37 @@ export default function CreatePIL() {
                 });
             }
 
-            // 2. Save PIL with File URLs
+            // 2. Generate Embedding and Unique ID
+            const descriptiveText = `${title} ${description} ${category} ${stateLocation} ${city}`;
+            const embedding = await generateEmbedding(descriptiveText);
+            const pilId = `PIL-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+            // 3. Save PIL with File URLs
             const docRef = await addDoc(collection(db, "pils"), {
+                pilId,
                 title: title.trim(),
+                category: category || "Public Safety",
+                location: {
+                    state: stateLocation.trim(),
+                    city: city.trim()
+                },
                 description: description.trim(),
-                evidence: evidence.trim(),
+                sinceWhen: sinceWhen.trim(),
+                affectedGroup: affectedGroup.trim(),
+                evidenceDescription: evidenceDescription.trim(),
+                publicHealth: publicHealth,
+                urgency: urgency,
+                complaintFiled: complaintFiled,
                 evidenceFiles: fileUrls,
                 createdBy: user.uid,
                 creatorName: user.displayName || "Anonymous",
                 createdAt: serverTimestamp(),
                 supporters: 0,
-                status: "Filed",
-                upvotedBy: []
+                status: "Awaiting Consensus",
+                upvotedBy: [],
+                embedding: embedding
             });
+            localStorage.removeItem("pil_draft");
             router.push(`/pil/${docRef.id}`);
         } catch (error) {
             console.error("Error creating PIL:", error);
@@ -224,6 +342,13 @@ export default function CreatePIL() {
 
     return (
         <div className="min-h-screen bg-muted/30">
+            {/* Draft Restored Toast */}
+            {draftRestored && (
+                <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-blue-600 text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-2 text-sm font-bold animate-in slide-in-from-top-4">
+                    <CheckCircle2 size={16} />
+                    Draft restored from your last session
+                </div>
+            )}
             {/* Header */}
             <div className="bg-background border-b border-border py-4 sticky top-[65px] z-30">
                 <div className="container mx-auto px-4 flex items-center justify-between">
@@ -251,133 +376,382 @@ export default function CreatePIL() {
                     {/* Form Left Side */}
                     <div className="lg:col-span-8 space-y-8">
                         <section className="bg-background p-8 rounded-3xl border border-border shadow-sm">
-                            <form onSubmit={handleSubmit} className="space-y-6">
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold flex items-center gap-2">
-                                        <FileText size={16} className="text-primary" />
-                                        {t("create_pil.form_title")}
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={title}
-                                        onChange={(e) => setTitle(e.target.value)}
-                                        placeholder={t("create_pil.placeholder_title")}
-                                        className="w-full text-lg font-semibold bg-muted/50 border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                                        required
-                                    />
-                                    <AnimatePresence>
-                                        {duplicates.length > 0 && (
-                                            <motion.div
-                                                initial={{ opacity: 0, height: 0 }}
-                                                animate={{ opacity: 1, height: "auto" }}
-                                                exit={{ opacity: 0, height: 0 }}
-                                                className="mt-3 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/30 rounded-xl"
-                                            >
-                                                <p className="text-xs font-bold text-amber-800 dark:text-amber-400 mb-2 flex items-center gap-2">
-                                                    <AlertCircle size={14} />
-                                                    {t("create_pil.duplicate_warning")}
-                                                </p>
-                                                <div className="space-y-2">
-                                                    {duplicates.map((dup) => (
-                                                        <Link
-                                                            key={dup.id}
-                                                            href={`/pil/${dup.id}`}
-                                                            className="flex items-center justify-between bg-white dark:bg-background/50 p-2 rounded-lg border border-amber-100 dark:border-amber-900/20 text-xs hover:border-amber-300 transition-colors"
-                                                        >
-                                                            <span className="font-medium line-clamp-1">{dup.title}</span>
-                                                            <ChevronRight size={14} />
-                                                        </Link>
-                                                    ))}
+                            <form onSubmit={(e) => { e.preventDefault(); setStep(2); }} className="space-y-6">
+                                <AnimatePresence mode="wait">
+                                    {step === 1 && (
+                                        <motion.div
+                                            key="step1"
+                                            initial={{ opacity: 0, x: -20 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            exit={{ opacity: 0, x: 20 }}
+                                            className="space-y-6"
+                                        >
+                                            <div className="space-y-4">
+                                                <div>
+                                                    <label className="text-sm font-bold flex items-center gap-2 mb-2">
+                                                        <FileText size={16} className="text-primary" />
+                                                        {t("create_pil.form_title")}
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={title}
+                                                        onChange={(e) => setTitle(e.target.value)}
+                                                        placeholder={t("create_pil.placeholder_title")}
+                                                        className="w-full text-lg font-semibold bg-muted/50 border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                                                        required
+                                                    />
                                                 </div>
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-                                </div>
 
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold flex items-center gap-2">
-                                        <Info size={16} className="text-primary" />
-                                        {t("create_pil.form_desc")}
-                                    </label>
-                                    <textarea
-                                        value={description}
-                                        onChange={(e) => setDescription(e.target.value)}
-                                        placeholder={t("create_pil.placeholder_desc")}
-                                        rows={8}
-                                        className="w-full bg-muted/50 border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all resize-none"
-                                        required
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <label className="text-sm font-bold flex items-center gap-2">
-                                        <LinkIcon size={16} className="text-primary" />
-                                        {t("create_pil.form_evidence")}
-                                    </label>
-                                    <textarea
-                                        value={evidence}
-                                        onChange={(e) => setEvidence(e.target.value)}
-                                        placeholder={t("create_pil.placeholder_evidence")}
-                                        rows={3}
-                                        className="w-full bg-muted/50 border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all resize-none"
-                                    />
-                                </div>
-
-                                <div className="space-y-4">
-                                    <label className="text-sm font-bold flex items-center gap-2">
-                                        <Upload size={16} className="text-primary" />
-                                        Upload Evidence (Images/PDFs)
-                                    </label>
-
-                                    <div className="flex flex-col gap-4">
-                                        <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-border rounded-2xl cursor-pointer hover:bg-muted/50 transition-all">
-                                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                                <Upload className="w-8 h-8 text-muted-foreground mb-2" />
-                                                <p className="text-xs text-muted-foreground">Click to upload or drag and drop</p>
-                                                <p className="text-[10px] text-muted-foreground">PDF, JPG, PNG (Max 5MB)</p>
-                                            </div>
-                                            <input type="file" className="hidden" multiple accept="image/*,application/pdf" onChange={handleFileChange} />
-                                        </label>
-
-                                        {files.length > 0 && (
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                {files.map((file, i) => (
-                                                    <div key={i} className="flex items-center justify-between p-3 bg-muted/50 rounded-xl border border-border group">
-                                                        <div className="flex items-center gap-3 overflow-hidden">
-                                                            {file.type.startsWith("image/") ? <ImageIcon size={16} className="text-primary shrink-0" /> : <File size={16} className="text-primary shrink-0" />}
-                                                            <div className="flex flex-col overflow-hidden">
-                                                                <span className="text-xs font-bold truncate">{file.name}</span>
-                                                                {uploadProgress[file.name] !== undefined && (
-                                                                    <div className="w-full bg-muted rounded-full h-1 mt-1">
-                                                                        <div
-                                                                            className="bg-primary h-full rounded-full transition-all"
-                                                                            style={{ width: `${uploadProgress[file.name]}%` }}
-                                                                        />
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                        <button
-                                                            onClick={() => removeFile(i)}
-                                                            className="text-muted-foreground hover:text-destructive p-1 rounded-full hover:bg-destructive/10 transition-all"
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="text-sm font-bold flex items-center gap-2 mb-2">
+                                                            <Filter size={16} className="text-primary" />
+                                                            Category
+                                                        </label>
+                                                        <select
+                                                            value={category}
+                                                            onChange={(e) => setCategory(e.target.value)}
+                                                            className="w-full bg-muted/50 border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
                                                         >
-                                                            <X size={14} />
-                                                        </button>
+                                                            <option>Environment</option>
+                                                            <option>Public Safety</option>
+                                                            <option>Corruption</option>
+                                                            <option>Civic Infrastructure</option>
+                                                            <option>Human Rights</option>
+                                                            <option>Education</option>
+                                                            <option>Healthcare</option>
+                                                            <option>Other</option>
+                                                        </select>
                                                     </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
+                                                </div>
 
-                                <button
-                                    type="submit"
-                                    disabled={loading || uploading}
-                                    className="w-full bg-secondary text-white py-4 rounded-xl font-bold text-lg shadow-xl shadow-secondary/20 hover:shadow-secondary/40 transition-all flex items-center justify-center gap-3 active:scale-[0.98] disabled:opacity-50"
-                                >
-                                    {loading ? <div className="w-6 h-6 border-4 border-white border-t-transparent animate-spin rounded-full" /> : <Send size={20} />}
-                                    {uploading ? "Uploading Evidence..." : t("create_pil.submit")}
-                                </button>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="text-sm font-bold flex items-center gap-2 mb-2">
+                                                            <MapPin size={16} className="text-primary" />
+                                                            State
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={stateLocation}
+                                                            onChange={(e) => setStateLocation(e.target.value)}
+                                                            placeholder="e.g. Uttar Pradesh"
+                                                            className="w-full bg-muted/50 border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                                                            required
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-sm font-bold flex items-center gap-2 mb-2">
+                                                            <MapPin size={16} className="text-primary" />
+                                                            City
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={city}
+                                                            onChange={(e) => setCity(e.target.value)}
+                                                            placeholder="e.g. Lucknow"
+                                                            className="w-full bg-muted/50 border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                                                            required
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                type="submit"
+                                                className="w-full bg-primary text-white py-4 rounded-xl font-bold text-lg shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all flex items-center justify-center gap-3"
+                                            >
+                                                Continue to Details <ArrowRight size={20} />
+                                            </button>
+                                        </motion.div>
+                                    )}
+
+                                    {step === 2 && (
+                                        <motion.div
+                                            key="step2"
+                                            initial={{ opacity: 0, x: -20 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            exit={{ opacity: 0, x: 20 }}
+                                            className="space-y-6"
+                                        >
+                                            <div className="bg-primary/5 border border-primary/20 rounded-2xl p-6 mb-6">
+                                                <h3 className="font-bold text-primary mb-2 flex items-center gap-2">
+                                                    <Info size={18} />
+                                                    Step 2: Issue Details
+                                                </h3>
+                                                <p className="text-sm text-muted-foreground">
+                                                    Provide specific details to build a strong legal case.
+                                                </p>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-bold flex items-center gap-2">
+                                                    <FileText size={16} className="text-primary" />
+                                                    What is the problem?
+                                                </label>
+                                                <textarea
+                                                    value={description}
+                                                    onChange={(e) => setDescription(e.target.value)}
+                                                    placeholder="Describe the issue in detail..."
+                                                    rows={6}
+                                                    className="w-full bg-muted/50 border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all resize-none"
+                                                    required
+                                                />
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <label className="text-sm font-bold flex items-center gap-2">
+                                                        <Clock size={16} className="text-primary" />
+                                                        Since when is it happening?
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={sinceWhen}
+                                                        onChange={(e) => setSinceWhen(e.target.value)}
+                                                        placeholder="e.g. Last 6 months"
+                                                        className="w-full bg-muted/50 border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                                                        required
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-sm font-bold flex items-center gap-2">
+                                                        <Users size={16} className="text-primary" />
+                                                        Who is affected?
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={affectedGroup}
+                                                        onChange={(e) => setAffectedGroup(e.target.value)}
+                                                        placeholder="e.g. Residents of XYZ Colony"
+                                                        className="w-full bg-muted/50 border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                                                        required
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-bold flex items-center gap-2">
+                                                    <Paperclip size={16} className="text-primary" />
+                                                    What proof do you have?
+                                                </label>
+                                                <textarea
+                                                    value={evidenceDescription}
+                                                    onChange={(e) => setEvidenceDescription(e.target.value)}
+                                                    placeholder="Describe any photos, documents, or reports you have..."
+                                                    rows={3}
+                                                    className="w-full bg-muted/50 border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all resize-none mb-2"
+                                                />
+                                                {/* File Upload UI */}
+                                                <div className="border-2 border-dashed border-primary/20 rounded-xl p-8 text-center hover:bg-primary/5 transition-colors cursor-pointer relative">
+                                                    <input
+                                                        type="file"
+                                                        multiple
+                                                        onChange={handleFileChange}
+                                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                                    />
+                                                    <div className="flex flex-col items-center gap-2">
+                                                        <UploadCloud size={32} className="text-primary/60" />
+                                                        <p className="font-bold text-lg">Click to Upload Evidence</p>
+                                                        <p className="text-sm text-muted-foreground">Photos, PDFs, or Documents (Max 5MB)</p>
+                                                    </div>
+                                                </div>
+
+                                                {files.length > 0 && (
+                                                    <div className="space-y-2 mt-4">
+                                                        {files.map((file, idx) => (
+                                                            <div key={idx} className="flex items-center justify-between bg-white dark:bg-background/50 p-3 rounded-lg border border-border">
+                                                                <div className="flex items-center gap-3 overflow-hidden">
+                                                                    <FileText size={18} className="text-primary shrink-0" />
+                                                                    <span className="text-sm font-medium truncate">{file.name}</span>
+                                                                    <span className="text-xs text-muted-foreground">({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+                                                                </div>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => removeFile(idx)}
+                                                                    className="p-1.5 hover:bg-red-50 text-red-500 rounded-full transition-colors"
+                                                                >
+                                                                    <X size={16} />
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <div>
+                                                    <label className="text-sm font-bold flex items-center gap-2 mb-2">
+                                                        <ShieldAlert size={16} className="text-primary" />
+                                                        Public Health Impact?
+                                                    </label>
+                                                    <div className="flex gap-4">
+                                                        {["Yes", "No"].map((opt) => (
+                                                            <label key={opt} className="flex items-center gap-2 cursor-pointer">
+                                                                <input
+                                                                    type="radio"
+                                                                    name="publicHealth"
+                                                                    value={opt}
+                                                                    checked={publicHealth === opt}
+                                                                    onChange={(e) => setPublicHealth(e.target.value)}
+                                                                    className="w-4 h-4 text-primary focus:ring-primary"
+                                                                />
+                                                                <span className="text-sm font-medium">{opt}</span>
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="text-sm font-bold flex items-center gap-2 mb-2">
+                                                        <Flame size={16} className="text-primary" />
+                                                        Urgency
+                                                    </label>
+                                                    <select
+                                                        value={urgency}
+                                                        onChange={(e) => setUrgency(e.target.value)}
+                                                        className="w-full bg-muted/50 border border-border rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                                                    >
+                                                        <option>Low</option>
+                                                        <option>Medium</option>
+                                                        <option>High</option>
+                                                        <option>Critical</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="text-sm font-bold flex items-center gap-2 mb-2">
+                                                        <MessageSquare size={16} className="text-primary" />
+                                                        Complaint Filed?
+                                                    </label>
+                                                    <div className="flex gap-4">
+                                                        {["Yes", "No"].map((opt) => (
+                                                            <label key={opt} className="flex items-center gap-2 cursor-pointer">
+                                                                <input
+                                                                    type="radio"
+                                                                    name="complaintFiled"
+                                                                    value={opt}
+                                                                    checked={complaintFiled === opt}
+                                                                    onChange={(e) => setComplaintFiled(e.target.value)}
+                                                                    className="w-4 h-4 text-primary focus:ring-primary"
+                                                                />
+                                                                <span className="text-sm font-medium">{opt}</span>
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex flex-col sm:flex-row gap-4 pt-4">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setStep(1)}
+                                                    className="flex-1 bg-muted text-foreground py-4 rounded-xl font-bold border border-border"
+                                                >
+                                                    Back
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { validatePIL(); setStep(3); }}
+                                                    className="flex-1 bg-primary text-white py-4 rounded-xl font-bold shadow-lg"
+                                                >
+                                                    Proceed to Review
+                                                </button>
+                                            </div>
+                                        </motion.div>
+                                    )}
+
+                                    {step === 3 && (
+                                        <motion.div
+                                            key="step3"
+                                            initial={{ opacity: 0, x: -20 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            exit={{ opacity: 0, x: 20 }}
+                                            className="space-y-6"
+                                        >
+                                            <div className="bg-primary/5 border border-primary/20 rounded-2xl p-6 mb-6">
+                                                <h3 className="font-bold text-primary mb-2 flex items-center gap-2">
+                                                    <CheckCircle2 size={18} />
+                                                    Step 3: Review & Submit
+                                                </h3>
+                                                <p className="text-sm text-muted-foreground">
+                                                    Review your details before filing. Our AI has checked for duplicates.
+                                                </p>
+                                            </div>
+
+                                            <div className="bg-muted/30 rounded-xl p-6 space-y-4 border border-border">
+                                                <div>
+                                                    <h4 className="text-xs font-bold uppercase text-muted-foreground mb-1">Title & Category</h4>
+                                                    <p className="font-bold text-lg">{title}</p>
+                                                    <div className="flex gap-2 mt-1">
+                                                        <span className="bg-primary/10 text-primary text-xs px-2 py-1 rounded-full font-medium">{category}</span>
+                                                        <span className="bg-muted text-muted-foreground text-xs px-2 py-1 rounded-full font-medium">{city}, {stateLocation}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <h4 className="text-xs font-bold uppercase text-muted-foreground mb-1">Affected Group</h4>
+                                                        <p className="text-sm font-medium">{affectedGroup}</p>
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="text-xs font-bold uppercase text-muted-foreground mb-1">Since When</h4>
+                                                        <p className="text-sm font-medium">{sinceWhen}</p>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-xs font-bold uppercase text-muted-foreground mb-1">Problem Description</h4>
+                                                    <p className="text-sm whitespace-pre-wrap">{description}</p>
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-xs font-bold uppercase text-muted-foreground mb-1">Evidence Summary</h4>
+                                                    <p className="text-sm">{evidenceDescription}</p>
+                                                    {files.length > 0 && (
+                                                        <p className="text-xs text-primary mt-1 flex items-center gap-1">
+                                                            <Paperclip size={12} /> {files.length} files attached
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* AI Feedback Section */}
+                                            {validation && (
+                                                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-900/30 p-5 rounded-xl">
+                                                    <h4 className="font-bold text-blue-800 dark:text-blue-300 flex items-center gap-2 mb-2">
+                                                        <Sparkles size={16} /> AI Legal Assistant Feedback
+                                                    </h4>
+                                                    <div className="text-sm text-blue-800/80 dark:text-blue-300/80 prose prose-sm max-w-none">
+                                                        <div dangerouslySetInnerHTML={{ __html: validation.replace(/\n/g, '<br/>') }} />
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <div className="flex flex-col sm:flex-row gap-4 pt-4">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setStep(2)}
+                                                    className="flex-1 bg-muted text-foreground py-4 rounded-xl font-bold border border-border"
+                                                >
+                                                    Back to Edit
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleSubmit}
+                                                    disabled={loading || uploading}
+                                                    className="flex-1 bg-primary text-white py-4 rounded-xl font-bold shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed"
+                                                >
+                                                    {loading ? (
+                                                        <>
+                                                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                            {uploading ? "Uploading Evidence..." : "Filing Petition..."}
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            Confirm & File PIL <Send size={20} />
+                                                        </>
+                                                    )}
+                                                </button>
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
                             </form>
                         </section>
                     </div>

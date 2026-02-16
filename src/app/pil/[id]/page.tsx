@@ -25,7 +25,12 @@ import {
     Info,
     Image as ImageIcon,
     File,
-    Paperclip
+    Paperclip,
+    MapPin,
+    Filter,
+    Users,
+    MessageSquare,
+    Flame
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -33,9 +38,11 @@ import Link from "next/link";
 
 interface PIL {
     id: string;
+    pilId: string;
     title: string;
     description: string;
-    evidence: string;
+    evidence: string; // Deprecated
+    evidenceDescription?: string;
     supporters: number;
     createdAt: { seconds: number; nanoseconds: number } | null;
     createdBy: string;
@@ -45,10 +52,31 @@ interface PIL {
     hearingResult?: string;
     hearingDate?: string;
     evidenceFiles?: { name: string; url: string; type: string }[];
+    category?: string;
+    location?: { state: string; city: string };
+    urgency?: string;
+    sinceWhen?: string;
+    affectedGroup?: string;
+    publicHealth?: string;
+    complaintFiled?: string;
 }
 
 export default function PILDetail() {
     const { id } = useParams();
+    // ... (rest of imports)
+
+    // Helper to get safe values
+    const getSafePIL = (data: PIL): PIL => ({
+        ...data,
+        category: data.category || "General Social Welfare",
+        location: data.location || { city: "New Delhi", state: "Delhi" },
+        urgency: data.urgency || "Medium",
+        sinceWhen: data.sinceWhen || "Not specified",
+        affectedGroup: data.affectedGroup || "General Public",
+        publicHealth: data.publicHealth || "No",
+        complaintFiled: data.complaintFiled || "No",
+        evidenceDescription: data.evidenceDescription || data.evidence || "No specific evidence description provided."
+    });
     const router = useRouter();
     const { user, login } = useAuth();
     const [pil, setPil] = useState<PIL | null>(null);
@@ -66,7 +94,8 @@ export default function PILDetail() {
                 const docSnap = await getDoc(docRef);
                 if (docSnap.exists()) {
                     const data = docSnap.data() as PIL;
-                    setPil({ ...data, id: docSnap.id });
+                    const safeData = getSafePIL({ ...data, id: docSnap.id });
+                    setPil(safeData);
                     if (user && data.upvotedBy?.includes(user.uid)) {
                         setUpvoted(true);
                     }
@@ -94,9 +123,9 @@ export default function PILDetail() {
         }
 
         try {
-            console.log("Requesting summary from gemini-1.5-flash...");
+            console.log("Requesting summary from gemini-2.0-flash...");
             const genAI = new GoogleGenerativeAI(apiKey);
-            let model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+            let model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
             const prompt = `Specifically for this legal case titled "${pil.title}", 
             provide a 3-bullet point "Citizen's Brief" summary.
@@ -113,13 +142,10 @@ export default function PILDetail() {
             try {
                 result = await model.generateContent(prompt);
             } catch (innerError: unknown) {
-                if (innerError instanceof Error && innerError.message?.includes("404")) {
-                    console.warn("gemini-1.5-flash not found, falling back to gemini-pro");
-                    model = genAI.getGenerativeModel({ model: "gemini-pro" });
-                    result = await model.generateContent(prompt);
-                } else {
-                    throw innerError;
-                }
+                // If 2.0-flash failed for some reason, we could try gemini-pro if available, 
+                // but for this key we stay with what works.
+                console.error("Gemini request failed:", innerError);
+                throw innerError;
             }
 
             const response = await result.response;
@@ -144,16 +170,30 @@ export default function PILDetail() {
             login();
             return;
         }
-        if (upvoted || upvoting) return;
+        if (upvoted || upvoting || !pil) return;
 
         setUpvoting(true);
         try {
             const docRef = doc(db, "pils", id as string);
-            await updateDoc(docRef, {
+            const CONSENSUS_THRESHOLD = 200; // Updated threshold
+            const newSupporters = pil.supporters + 1;
+
+            // Check for consensus threshold
+            const updates: any = {
                 supporters: increment(1),
                 upvotedBy: arrayUnion(user.uid)
-            });
-            setPil(prev => prev ? { ...prev, supporters: prev.supporters + 1 } : null);
+            };
+
+            if (newSupporters >= CONSENSUS_THRESHOLD && pil.status === "Awaiting Consensus") {
+                updates.status = "Ready for Review";
+            }
+
+            await updateDoc(docRef, updates);
+            setPil(prev => prev ? {
+                ...prev,
+                supporters: newSupporters,
+                status: (newSupporters >= CONSENSUS_THRESHOLD && prev.status === "Awaiting Consensus") ? "Ready for Review" : prev.status
+            } : null);
             setUpvoted(true);
         } catch (error) {
             console.error("Error upvoting", error);
@@ -240,13 +280,15 @@ export default function PILDetail() {
     };
 
     const getStatusInfo = (status: string) => {
-        const s = status?.toLowerCase() || "filed";
+        const s = status?.toLowerCase() || "awaiting consensus";
         switch (s) {
             case "hearing": return { label: "In Hearing", color: "bg-purple-500", light: "bg-purple-100 text-purple-700" };
             case "accepted": return { label: "Accepted", color: "bg-green-500", light: "bg-green-100 text-green-700" };
             case "scrutiny": return { label: "Under Scrutiny", color: "bg-amber-500", light: "bg-amber-100 text-amber-700" };
             case "heard": return { label: "Heard", color: "bg-blue-600", light: "bg-blue-600 text-white" };
-            default: return { label: "Filed", color: "bg-blue-500", light: "bg-blue-100 text-blue-700" };
+            case "ready for review": return { label: "Ready for Review", color: "bg-green-600", light: "bg-green-100 text-green-700" };
+            case "awaiting consensus": return { label: "Awaiting Consensus", color: "bg-amber-500", light: "bg-amber-100 text-amber-700" };
+            default: return { label: status || "Awaiting Consensus", color: "bg-blue-500", light: "bg-blue-100 text-blue-700" };
         }
     };
 
@@ -311,6 +353,10 @@ export default function PILDetail() {
                                 {status.label}
                             </span>
                             <div className="h-1 w-1 rounded-full bg-border" />
+                            <span className="text-xs font-black text-primary/60 uppercase tracking-tighter bg-primary/5 px-2 py-0.5 rounded">
+                                {pil.pilId || `PIL-${pil.id.substring(0, 6).toUpperCase()}`}
+                            </span>
+                            <div className="h-1 w-1 rounded-full bg-border" />
                             <span className="text-xs text-muted-foreground flex items-center gap-1.5 font-medium">
                                 <Clock size={14} />
                                 {pil.createdAt ? new Date(pil.createdAt.seconds * 1000).toLocaleDateString() : "Recently Filed"}
@@ -320,6 +366,69 @@ export default function PILDetail() {
                         <h1 className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tight leading-[1.1] text-primary">
                             {pil.title}
                         </h1>
+
+                        {/* Metadata Tags */}
+                        <div className="flex flex-wrap gap-3 pt-2">
+                            {pil.category && (
+                                <span className="flex items-center gap-1.5 px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium">
+                                    <Filter size={14} />
+                                    {pil.category}
+                                </span>
+                            )}
+                            {pil.location && (
+                                <span className="flex items-center gap-1.5 px-3 py-1 bg-muted text-muted-foreground rounded-full text-sm font-medium">
+                                    <MapPin size={14} />
+                                    {pil.location.city}, {pil.location.state}
+                                </span>
+                            )}
+                            {pil.urgency && (
+                                <span className={cn(
+                                    "flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold",
+                                    pil.urgency === "Critical" || pil.urgency === "High" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                                )}>
+                                    <Flame size={14} />
+                                    {pil.urgency} Urgency
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Detailed Stats Grid */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-muted/30 p-4 rounded-xl border border-border">
+                            {pil.affectedGroup && (
+                                <div>
+                                    <p className="text-xs font-bold uppercase text-muted-foreground mb-1 flex items-center gap-1">
+                                        <Users size={12} /> Affected Group
+                                    </p>
+                                    <p className="font-medium text-sm">{pil.affectedGroup}</p>
+                                </div>
+                            )}
+                            {pil.sinceWhen && (
+                                <div>
+                                    <p className="text-xs font-bold uppercase text-muted-foreground mb-1 flex items-center gap-1">
+                                        <Clock size={12} /> Since When
+                                    </p>
+                                    <p className="font-medium text-sm">{pil.sinceWhen}</p>
+                                </div>
+                            )}
+                            {pil.publicHealth && (
+                                <div>
+                                    <p className="text-xs font-bold uppercase text-muted-foreground mb-1 flex items-center gap-1">
+                                        <ShieldAlert size={12} /> Public Health Impact
+                                    </p>
+                                    <p className={cn("font-medium text-sm", pil.publicHealth === "Yes" ? "text-red-600 font-bold" : "")}>
+                                        {pil.publicHealth}
+                                    </p>
+                                </div>
+                            )}
+                            {pil.complaintFiled && (
+                                <div>
+                                    <p className="text-xs font-bold uppercase text-muted-foreground mb-1 flex items-center gap-1">
+                                        <MessageSquare size={12} /> Complaint Filed
+                                    </p>
+                                    <p className="font-medium text-sm">{pil.complaintFiled}</p>
+                                </div>
+                            )}
+                        </div>
 
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pt-4">
                             <div className="flex items-center gap-4">
@@ -332,28 +441,107 @@ export default function PILDetail() {
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-4 p-2 bg-muted/50 rounded-2xl border border-border">
-                                <div className="px-6 py-2">
-                                    <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider mb-1">Total Supporters</div>
-                                    <div className="text-2xl font-black text-primary">{pil.supporters}</div>
+                            <div className="flex flex-col gap-3">
+                                <div className="flex items-center gap-4 p-2 bg-muted/50 rounded-2xl border border-border">
+                                    <div className="px-6 py-2">
+                                        <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider mb-1">Total Supporters</div>
+                                        <div className="text-2xl font-black text-primary">{pil.supporters}</div>
+                                    </div>
+                                    <button
+                                        onClick={handleUpvote}
+                                        disabled={upvoted || upvoting}
+                                        className={cn(
+                                            "px-8 py-3 rounded-xl font-black transition-all flex items-center gap-2 shadow-lg",
+                                            upvoted
+                                                ? "bg-green-100 text-green-700 shadow-green-200/50"
+                                                : "bg-secondary text-white shadow-secondary/30 hover:-translate-y-1 active:scale-95"
+                                        )}
+                                    >
+                                        {upvoting ? (
+                                            <div className="w-5 h-5 border-2 border-white border-t-transparent animate-spin rounded-full" />
+                                        ) : (
+                                            <ThumbsUp size={20} className={cn(upvoted && "fill-current")} />
+                                        )}
+                                        {upvoted ? "Signed" : "Sign Petition"}
+                                    </button>
                                 </div>
-                                <button
-                                    onClick={handleUpvote}
-                                    disabled={upvoted || upvoting}
-                                    className={cn(
-                                        "px-8 py-3 rounded-xl font-black transition-all flex items-center gap-2 shadow-lg",
-                                        upvoted
-                                            ? "bg-green-100 text-green-700 shadow-green-200/50"
-                                            : "bg-secondary text-white shadow-secondary/30 hover:-translate-y-1 active:scale-95"
-                                    )}
-                                >
-                                    {upvoting ? (
-                                        <div className="w-5 h-5 border-2 border-white border-t-transparent animate-spin rounded-full" />
-                                    ) : (
-                                        <ThumbsUp size={20} className={cn(upvoted && "fill-current")} />
-                                    )}
-                                    {upvoted ? "Signed" : "Sign Petition"}
-                                </button>
+
+                                {/* Consensus Progress */}
+                                {(() => {
+                                    const THRESHOLD = 200;
+                                    const progress = Math.min((pil.supporters / THRESHOLD) * 100, 100);
+                                    const consensusMet = pil.supporters >= THRESHOLD;
+                                    return (
+                                        <div className={cn(
+                                            "p-5 rounded-2xl border transition-all duration-300",
+                                            consensusMet
+                                                ? "bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800"
+                                                : "bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800"
+                                        )}>
+                                            <div className="flex items-center justify-between mb-3">
+                                                <span className="text-xs font-black uppercase tracking-widest opacity-70 flex items-center gap-2">
+                                                    {consensusMet ? <CheckCircle2 size={14} /> : <Users size={14} />}
+                                                    Consensus Check
+                                                </span>
+                                                <span className={cn(
+                                                    "text-xs font-bold px-3 py-1 rounded-full border",
+                                                    consensusMet
+                                                        ? "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/50 dark:text-emerald-300 dark:border-emerald-700"
+                                                        : "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/50 dark:text-amber-300 dark:border-amber-700"
+                                                )}>
+                                                    {consensusMet ? "Target Met" : "In Progress"}
+                                                </span>
+                                            </div>
+
+                                            <div className="mb-4">
+                                                <div className="flex justify-between text-sm font-bold mb-2">
+                                                    <span className="text-2xl">{pil.supporters}</span>
+                                                    <span className="text-muted-foreground self-end">/ {THRESHOLD}</span>
+                                                </div>
+                                                <div className="w-full bg-black/5 dark:bg-white/10 rounded-full h-3 overflow-hidden">
+                                                    <div
+                                                        className={cn(
+                                                            "h-full rounded-full transition-all duration-1000 ease-out relative",
+                                                            consensusMet ? "bg-emerald-500" : "bg-amber-500"
+                                                        )}
+                                                        style={{ width: `${progress}%` }}
+                                                    >
+                                                        <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className={cn(
+                                                "rounded-xl p-3 text-sm font-medium flex items-center gap-3 border",
+                                                consensusMet
+                                                    ? "bg-emerald-100/50 border-emerald-200/50 text-emerald-900 dark:text-emerald-100"
+                                                    : "bg-amber-100/50 border-amber-200/50 text-amber-900 dark:text-amber-100"
+                                            )}>
+                                                {consensusMet ? (
+                                                    <>
+                                                        <div className="w-8 h-8 rounded-full bg-emerald-200 flex items-center justify-center shrink-0">
+                                                            <Scale size={16} className="text-emerald-800" />
+                                                        </div>
+                                                        <div>
+                                                            <div className="font-bold text-xs uppercase opacity-70">Status</div>
+                                                            <div>Ready for Legal Review</div>
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <div className="w-8 h-8 rounded-full bg-amber-200 flex items-center justify-center shrink-0">
+                                                            <Users size={16} className="text-amber-800" />
+                                                        </div>
+                                                        <div>
+                                                            <div className="font-bold text-xs uppercase opacity-70">Next Step</div>
+                                                            <div>Need <strong>{THRESHOLD - pil.supporters}</strong> more signatures</div>
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         </div>
                     </div>
@@ -486,18 +674,18 @@ export default function PILDetail() {
                                 </div>
                             </section>
 
-                            {(pil.evidence || (pil.evidenceFiles && pil.evidenceFiles.length > 0)) && (
+                            {(pil.evidence || pil.evidenceDescription || (pil.evidenceFiles && pil.evidenceFiles.length > 0)) && (
                                 <section className="space-y-6">
                                     <h2 className="text-2xl font-bold flex items-center gap-3">
                                         <Scale className="text-primary" size={24} />
                                         Evidence & Resources
                                     </h2>
 
-                                    {pil.evidence && (
+                                    {(pil.evidence || pil.evidenceDescription) && (
                                         <div className="bg-muted/30 border border-border border-dashed rounded-3xl p-8 italic text-muted-foreground relative overflow-hidden">
                                             <div className="relative z-10 flex gap-4">
                                                 <ExternalLink className="flex-shrink-0 text-primary/30" size={24} />
-                                                <div>{pil.evidence}</div>
+                                                <div className="whitespace-pre-wrap">{pil.evidenceDescription || pil.evidence}</div>
                                             </div>
                                             <div className="absolute top-0 right-0 p-2 opacity-5">
                                                 <ShieldAlert size={120} />
