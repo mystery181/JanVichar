@@ -101,13 +101,14 @@ export default function CreatePIL() {
     }, [title, category, stateLocation, city, description, sinceWhen, affectedGroup, evidenceDescription, publicHealth, urgency, complaintFiled, step]);
 
     useEffect(() => {
-        if (description.length < 20) {
+        if (title.length < 5 && description.length < 10) {
             setDuplicates([]);
             setDuplicateScore(0);
             return;
         }
 
         const timeoutId = setTimeout(async () => {
+            console.log("Checking for duplicates...", { title, description });
             setSearchingDuplicates(true);
             try {
                 // Fetch PILs and generate current embedding in parallel
@@ -116,11 +117,14 @@ export default function CreatePIL() {
 
                 // Construct the full text for embedding to match storage logic
                 const currentText = `${title} ${description} ${category} ${stateLocation} ${city}`;
+                console.log("Generating embedding for:", currentText);
 
                 const [currentEmbedding, snapshot] = await Promise.all([
                     generateEmbedding(currentText),
                     getDocs(q)
                 ]);
+
+                console.log("Fetch complete. PILs found:", snapshot.size);
 
                 // Split PILs into those with/without embeddings
                 const withEmbedding: { id: string; data: any; embedding: number[] }[] = [];
@@ -134,6 +138,8 @@ export default function CreatePIL() {
                         needsEmbedding.push({ id: docSnap.id, data });
                     }
                 });
+
+                console.log("PILs with embedding:", withEmbedding.length, "Needs embedding:", needsEmbedding.length);
 
                 // Generate missing embeddings in parallel (fast!) + cache them to Firestore
                 const embeddingResults = await Promise.allSettled(
@@ -172,6 +178,8 @@ export default function CreatePIL() {
                         mostSimilar = { id: pil.id, ...pil.data } as PIL;
                     }
                 }
+
+                console.log("Max Similarity Score:", maxScore, "Most Similar PIL:", mostSimilar?.title);
 
                 if (maxScore > 0.6) {
                     setDuplicates(mostSimilar ? [mostSimilar] : []);
@@ -483,6 +491,64 @@ export default function CreatePIL() {
                                                     Provide specific details to build a strong legal case.
                                                 </p>
                                             </div>
+
+                                            {/* AI Duplicate Detection Alert */}
+                                            {duplicates.length > 0 && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, y: -10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    className="bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-900/30 rounded-2xl p-6 mb-8 shadow-sm"
+                                                >
+                                                    <div className="flex items-start gap-4">
+                                                        <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-xl shrink-0 text-orange-600 dark:text-orange-400">
+                                                            <Sparkles size={24} />
+                                                        </div>
+                                                        <div className="flex-1 space-y-4">
+                                                            <div>
+                                                                <h4 className="text-orange-900 dark:text-orange-100 font-bold text-lg mb-1">
+                                                                    Similar PIL Detected
+                                                                </h4>
+                                                                <p className="text-sm text-orange-700/80 dark:text-orange-300/80 leading-relaxed">
+                                                                    Our AI has identified an existing petition that closely matches yours. Joining forces might lead to a faster resolution.
+                                                                </p>
+                                                            </div>
+
+                                                            <div className="bg-white/60 dark:bg-black/20 rounded-xl p-4 border border-orange-100 dark:border-orange-900/20 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                                <div>
+                                                                    <div className="text-xs font-bold text-orange-500 dark:text-orange-400 uppercase tracking-wider mb-1">Detection Status</div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="bg-orange-600 text-white px-2.5 py-0.5 rounded-full text-xs font-bold">DUPLICATE MATCH</span>
+                                                                    </div>
+                                                                </div>
+                                                                <div>
+                                                                    <div className="text-xs font-bold text-orange-500 dark:text-orange-400 uppercase tracking-wider mb-1">Similarity Score</div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-lg font-mono font-bold text-orange-900 dark:text-orange-100">
+                                                                            {(duplicateScore * 100).toFixed(1)}%
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="sm:col-span-2 pt-2 border-t border-orange-100 dark:border-orange-900/20">
+                                                                    <div className="text-xs font-bold text-orange-500 dark:text-orange-400 uppercase tracking-wider mb-2">Original Petition</div>
+                                                                    <div className="flex items-center justify-between bg-white dark:bg-black/40 p-3 rounded-lg border border-orange-100 dark:border-orange-900/20">
+                                                                        <div>
+                                                                            <span className="block font-medium text-sm text-orange-900 dark:text-orange-100 line-clamp-1">{duplicates[0].title}</span>
+                                                                            <span className="text-xs font-mono text-orange-500 dark:text-orange-400">{duplicates[0].pilId || duplicates[0].id}</span>
+                                                                        </div>
+                                                                        <Link
+                                                                            href={`/pil/${duplicates[0].id}`}
+                                                                            target="_blank"
+                                                                            className="flex items-center gap-2 bg-orange-100 hover:bg-orange-200 dark:bg-orange-900/40 dark:hover:bg-orange-900/60 text-orange-700 dark:text-orange-200 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+                                                                        >
+                                                                            View Status <ArrowRight size={14} />
+                                                                        </Link>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </motion.div>
+                                            )}
 
                                             <div className="space-y-2">
                                                 <label className="text-sm font-bold flex items-center gap-2">
