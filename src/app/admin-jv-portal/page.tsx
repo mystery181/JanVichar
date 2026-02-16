@@ -14,9 +14,9 @@ interface PIL {
     supporters: number;
     createdAt: unknown;
     creatorName?: string;
-    status?: string;
-    hearingResult?: string;
-    hearingDate?: string;
+    category?: string;
+    location?: { state: string; city: string };
+    urgency?: string;
 }
 
 export default function AdminPortal() {
@@ -24,6 +24,7 @@ export default function AdminPortal() {
     const router = useRouter();
     const [pils, setPils] = useState<PIL[]>([]);
     const [loading, setLoading] = useState(true);
+    const [healing, setHealing] = useState(false);
 
     useEffect(() => {
         const isAdmin = localStorage.getItem("jv_admin_session") === "true";
@@ -71,6 +72,32 @@ export default function AdminPortal() {
         }
     };
 
+    const healLegacyData = async () => {
+        if (!confirm("This will overwrite missing fields with default values for all PILs. Continue?")) return;
+        setHealing(true);
+        let updatedCount = 0;
+        try {
+            const updates = pils.map(async (pil) => {
+                const needsUpdate = !pil.category || !pil.location || !pil.urgency;
+                if (needsUpdate) {
+                    await updateDoc(doc(db, "pils", pil.id), {
+                        category: pil.category || "Public Safety",
+                        location: pil.location || { state: "India", city: "New Delhi" },
+                        urgency: pil.urgency || "Medium"
+                    });
+                    updatedCount++;
+                }
+            });
+            await Promise.all(updates);
+            alert(`Successfully healed ${updatedCount} legacy records.`);
+        } catch (error) {
+            console.error("Error healing data:", error);
+            alert("Failed to heal data. Check console.");
+        } finally {
+            setHealing(false);
+        }
+    };
+
     if (authLoading || loading) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[70vh] gap-4">
@@ -107,6 +134,7 @@ export default function AdminPortal() {
                         <thead className="bg-[#800000] text-white">
                             <tr>
                                 <th className="p-5 font-bold text-sm uppercase tracking-widest whitespace-nowrap">Petition Details</th>
+                                <th className="p-5 font-bold text-sm uppercase tracking-widest whitespace-nowrap">Category/Loc</th>
                                 <th className="p-5 font-bold text-sm uppercase tracking-widest whitespace-nowrap">Creator</th>
                                 <th className="p-5 font-bold text-sm uppercase tracking-widest whitespace-nowrap text-center">Support</th>
                                 <th className="p-5 font-bold text-sm uppercase tracking-widest whitespace-nowrap">Status</th>
@@ -116,16 +144,32 @@ export default function AdminPortal() {
                         <tbody className="divide-y divide-border">
                             {pils.map((pil) => (
                                 <tr key={pil.id} className="hover:bg-muted/30 transition-colors group">
-                                    <td className="p-5">
-                                        <div className="font-black text-foreground mb-1 group-hover:text-primary transition-colors">{pil.title}</div>
+                                    <td className="p-5 max-w-xs">
+                                        <div className="font-black text-foreground mb-1 group-hover:text-primary transition-colors truncate" title={pil.title}>{pil.title}</div>
                                         <div className="text-[10px] text-muted-foreground font-mono opacity-50">ID: {pil.id}</div>
+                                    </td>
+                                    <td className="p-5">
+                                        <div className="flex flex-col gap-1">
+                                            <span className="text-xs font-bold bg-primary/10 text-primary px-2 py-0.5 rounded w-fit">
+                                                {pil.category || "N/A"}
+                                            </span>
+                                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                                <AlertTriangle size={10} /> {pil.urgency || "N/A"}
+                                            </span>
+                                            <span className="text-[10px] text-muted-foreground">
+                                                {pil.location?.city || "Unknown"}, {pil.location?.state || ""}
+                                            </span>
+                                        </div>
                                     </td>
                                     <td className="p-5">
                                         <div className="flex items-center gap-2">
                                             <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold">
                                                 {pil.creatorName?.charAt(0) || "A"}
                                             </div>
-                                            <span className="text-sm font-bold text-muted-foreground">{pil.creatorName || "Anonymous"}</span>
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-bold text-muted-foreground">{pil.creatorName || "Anonymous"}</span>
+                                                <span className="text-[10px] text-muted-foreground/60">Citizen</span>
+                                            </div>
                                         </div>
                                     </td>
                                     <td className="p-5 text-center">
@@ -205,16 +249,26 @@ export default function AdminPortal() {
                 )}
             </div>
 
-            <div className="mt-12 p-8 bg-destructive/5 border border-destructive/10 rounded-3xl flex flex-col sm:flex-row items-center gap-6">
-                <div className="w-16 h-16 bg-destructive/10 rounded-2xl flex items-center justify-center text-destructive shrink-0">
-                    <AlertTriangle size={32} />
+            <div className="mt-12 p-8 bg-destructive/5 border border-destructive/10 rounded-3xl flex flex-col sm:flex-row items-center gap-6 justify-between">
+                <div className="flex items-center gap-6">
+                    <div className="w-16 h-16 bg-destructive/10 rounded-2xl flex items-center justify-center text-destructive shrink-0">
+                        <AlertTriangle size={32} />
+                    </div>
+                    <div className="space-y-2">
+                        <h4 className="text-xl font-black text-destructive">Administrative Safeguards</h4>
+                        <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl font-medium">
+                            You have full authority to modify and remove records from the core database. Please exercise extreme caution, as deletions are permanent.
+                        </p>
+                    </div>
                 </div>
-                <div className="space-y-2">
-                    <h4 className="text-xl font-black text-destructive">Administrative Safeguards</h4>
-                    <p className="text-sm text-muted-foreground leading-relaxed max-w-3xl font-medium">
-                        You have full authority to modify and remove records from the core database. Please exercise extreme caution, as deletions are permanent and status updates are visible to the public in real-time.
-                    </p>
-                </div>
+                <button
+                    onClick={healLegacyData}
+                    disabled={healing}
+                    className="bg-amber-500 hover:bg-amber-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
+                >
+                    {healing ? <div className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full" /> : <Clock size={18} />}
+                    {healing ? "Healing..." : "Heal Legacy Data"}
+                </button>
             </div>
         </div>
     );
